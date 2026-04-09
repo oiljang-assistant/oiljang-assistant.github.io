@@ -104,6 +104,13 @@ body {
   border: 1px solid rgba(0,0,0,0.05); border-radius: 20px;
   padding: 8px 14px; font-size: 13px; font-weight: 700; color: #444; cursor: pointer;
 }
+.btn-stop {
+  background: linear-gradient(135deg, #ff416c, #ff4b2b);
+  box-shadow: 0 4px 12px rgba(255,65,108,0.4);
+  border: none; border-radius: 20px;
+  padding: 8px 14px; font-size: 13px; font-weight: 700; color: #fff; cursor: pointer;
+  display: none;
+}
 
 /* 글래스 카드 */
 .glass-card {
@@ -258,6 +265,7 @@ body {
           <span id="pcStatusText">PC 확인 중</span>
         </div>
         <button class="btn-logout" onclick="doLogout()">로그아웃</button>
+        <button class="btn-stop" id="btnStop" onclick="sendStop()">🛑 중지</button>
       </div>
     </div>
   </div>
@@ -361,6 +369,12 @@ function showMain() {
   document.getElementById('mainView').classList.remove('hidden');
   document.getElementById('headerUserInfo').classList.remove('hidden');
   document.getElementById('displayId').textContent = userId;
+  // 캐시 잔상 제거: 로그 텍스트 초기화
+  [1,2,3].forEach(n => {
+    document.getElementById(`logText-${n}`).textContent = '대기 중...';
+    document.getElementById(`logText-${n}`).style.opacity = '1';
+  });
+  document.getElementById('btnStop').style.display = 'none';
   startListeners();
 }
 
@@ -380,8 +394,27 @@ function startListeners() {
     if (data.data && data.data.message) {
       const msg = data.data.message;
       const step = data.data.step || 0;
+
+      // 진행 중이면 스탑 버튼 표시, 완료/대기면 숨김
+      const stopBtn = document.getElementById('btnStop');
+      if (msg.includes('진행 중') || msg.includes('수집 중') || msg.includes('스캔')) {
+        stopBtn.style.display = 'inline-block';
+      } else if (msg.includes('완료') || msg.includes('대기') || msg.includes('실패') || msg.includes('중단') || msg.includes('OFF')) {
+        stopBtn.style.display = 'none';
+      }
+
+      // 단계별 로그 업데이트
       if(step >= 1 && step <= 3) {
         document.getElementById(`logText-${step}`).innerHTML = `<b style="color:#0050d2;">⚡ ${msg}</b>`;
+      } else {
+        // step 없으면 최근 활성 단계 추정 (완료/에러 메시지)
+        if (msg.includes('스크래핑') || msg.includes('스캔') || msg.includes('매물')) {
+          document.getElementById('logText-1').innerHTML = `<b style="color:#0050d2;">⚡ ${msg}</b>`;
+        } else if (msg.includes('등록')) {
+          document.getElementById('logText-2').innerHTML = `<b style="color:#0050d2;">⚡ ${msg}</b>`;
+        } else if (msg.includes('갱신')) {
+          document.getElementById('logText-3').innerHTML = `<b style="color:#0050d2;">⚡ ${msg}</b>`;
+        }
       }
     }
   });
@@ -454,6 +487,22 @@ async function sendCmd(type, btnObj) {
   }
 
   if(btnObj) setTimeout(() => btnObj.disabled = false, 1500);
+}
+
+async function sendStop() {
+  try {
+    const resp = await fetch(`${DB_URL}/users/${userId}/command.json`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 'stop', active: true, timestamp: { '.sv': 'timestamp' } })
+    });
+    if (resp.ok) {
+      showToast('🛑 중지 명령 전송 완료');
+      document.getElementById('btnStop').style.display = 'none';
+    }
+  } catch (e) {
+    showToast('⚠️ 중지 명령 전송 실패');
+  }
 }
 
 function openSheet() {
