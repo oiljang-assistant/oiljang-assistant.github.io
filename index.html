@@ -109,7 +109,6 @@ body {
   box-shadow: 0 4px 12px rgba(255,65,108,0.4);
   border: none; border-radius: 20px;
   padding: 8px 14px; font-size: 13px; font-weight: 700; color: #fff; cursor: pointer;
-  display: none;
 }
 
 /* 글래스 카드 */
@@ -374,7 +373,6 @@ function showMain() {
     document.getElementById(`logText-${n}`).textContent = '대기 중...';
     document.getElementById(`logText-${n}`).style.opacity = '1';
   });
-  document.getElementById('btnStop').style.display = 'none';
   startListeners();
 }
 
@@ -394,14 +392,6 @@ function startListeners() {
     if (data.data && data.data.message) {
       const msg = data.data.message;
       const step = data.data.step || 0;
-
-      // 진행 중이면 스탑 버튼 표시, 완료/대기면 숨김
-      const stopBtn = document.getElementById('btnStop');
-      if (msg.includes('진행 중') || msg.includes('수집 중') || msg.includes('스캔')) {
-        stopBtn.style.display = 'inline-block';
-      } else if (msg.includes('완료') || msg.includes('대기') || msg.includes('실패') || msg.includes('중단') || msg.includes('OFF')) {
-        stopBtn.style.display = 'none';
-      }
 
       // 단계별 로그 업데이트
       if(step >= 1 && step <= 3) {
@@ -498,7 +488,6 @@ async function sendStop() {
     });
     if (resp.ok) {
       showToast('🛑 중지 명령 전송 완료');
-      document.getElementById('btnStop').style.display = 'none';
     }
   } catch (e) {
     showToast('⚠️ 중지 명령 전송 실패');
