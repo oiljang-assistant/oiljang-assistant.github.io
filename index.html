@@ -362,6 +362,10 @@ const progressQueues = { 2: [], 3: [] };
 
 // 진행 메시지 추가 (위로 올라가며 오래된 건 흐려짐)
 function addProgressLog(step, msg, type = 'normal') {
+  // 새 진행 메시지가 오면 이전 결과박스 숨기기
+  const box = document.getElementById(`resultBox-${step}`);
+  if (box) box.classList.add('hidden');
+
   const q = progressQueues[step];
   q.unshift({ msg, type });
   if (q.length > 3) q.pop();
@@ -433,39 +437,26 @@ function showMain() {
   startListeners();
 }
 
+let _pollTimer = null;
+let _lastStatusTs = 0;
+
 // Firebase 실시간 감시
 function startListeners() {
   stopListeners();
 
+  // PC 온/오프 배지 — SSE (가벼운 연결 상태만)
   statusSource = new EventSource(`${DB_URL}/users/${userId}/status.json`);
   statusSource.addEventListener('put', (e) => {
-    const data = JSON.parse(e.data);
-    updatePcBadge(data.data !== null);
-
-    if (data.data && data.data.sheet_url) {
-      window.currentSheetUrl = data.data.sheet_url;
-    }
-
-    if (data.data && data.data.message) {
-      const msg = data.data.message;
-      const step = data.data.step || 0;
-
-      if (step === 2) {
-        // 2단계 진행 중 메시지 → 로그에 추가
-        addProgressLog(2, msg);
-      } else if (step === 3) {
-        // 3단계 진행 중 메시지 → 로그에 추가
-        addProgressLog(3, msg);
-      } else {
-        // step 없음 = 최종 결과
-        if (msg.includes('등록')) {
-          showResult(2, msg, !msg.includes('실패'));
-        } else if (msg.includes('갱신')) {
-          addProgressLog(3, msg, msg.includes('실패') ? 'error' : 'done');
-        }
-      }
-    }
+    try {
+      const data = JSON.parse(e.data);
+      updatePcBadge(data.data !== null);
+      if (data.data && data.data.sheet_url) window.currentSheetUrl = data.data.sheet_url;
+    } catch(e) {}
   });
+
+  // 진행 상태 — 2초 폴링 (모바일 SSE 불안정 문제 방지)
+  pollStatus();
+  _pollTimer = setInterval(pollStatus, 2000);
 
   // 앱 열 때 최근 로그로 초기 상태 복원
   fetchLogsAndDistribute();
@@ -476,6 +467,37 @@ function startListeners() {
 function stopListeners() {
   if (statusSource) { statusSource.close(); statusSource = null; }
   if (logSource) { logSource.close(); logSource = null; }
+  if (_pollTimer) { clearInterval(_pollTimer); _pollTimer = null; }
+}
+
+function pollStatus() {
+  fetch(`${DB_URL}/users/${userId}/status.json`)
+    .then(r => r.json())
+    .then(data => {
+      if (!data || !data.message) return;
+      // 이미 처리한 타임스탬프면 무시
+      const ts = data.timestamp || 0;
+      if (ts && ts === _lastStatusTs) return;
+      _lastStatusTs = ts;
+
+      const msg = data.message;
+      const step = data.step || 0;
+      updatePcBadge(true);
+      if (data.sheet_url) window.currentSheetUrl = data.sheet_url;
+
+      if (step === 2) {
+        addProgressLog(2, msg);
+      } else if (step === 3) {
+        addProgressLog(3, msg);
+      } else {
+        if (msg.includes('등록')) {
+          showResult(2, msg, !msg.includes('실패'));
+        } else if (msg.includes('갱신')) {
+          addProgressLog(3, msg, msg.includes('실패') ? 'error' : 'done');
+        }
+      }
+    })
+    .catch(() => {});
 }
 
 function updatePcBadge(isOnline) {
