@@ -199,23 +199,67 @@ body {
 
 .row-btns { display: flex; gap: 12px; }
 
-/* 단계별 전용 상태창 */
-.step-log-box {
-  margin-top: 16px;
-  background: rgba(255,255,255,0.4);
-  border-radius: 16px;
-  padding: 16px 18px;
-  font-size: 15px;
-  font-weight: 600;
+/* 카드 타이틀 */
+.card-title {
+  font-size: 16px;
+  font-weight: 800;
   color: #333;
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  min-height: 52px;
-  line-height: 1.5;
-  box-shadow: inset 0 2px 6px rgba(0,0,0,0.05);
+  margin-bottom: 12px;
+  text-align: left;
 }
-.step-log-icon { font-size: 16px; margin-top: 2px; color: #666; }
+
+/* 진행 로그 (최대 3줄, 위로 올라가며 흐려짐) */
+.progress-log {
+  margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-height: 0;
+}
+.log-line {
+  font-size: 13px;
+  font-weight: 600;
+  color: #444;
+  padding: 6px 12px;
+  background: rgba(255,255,255,0.55);
+  border-radius: 10px;
+  animation: slideUp 0.3s ease;
+  transition: opacity 0.4s;
+}
+.log-line.mid { opacity: 0.45; }
+.log-line.old { opacity: 0.2; }
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* 최종 결과 박스 */
+.result-box {
+  margin-top: 14px;
+  padding: 16px 18px;
+  border-radius: 16px;
+  font-size: 16px;
+  font-weight: 800;
+  text-align: center;
+  line-height: 1.5;
+  animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+.result-box.success {
+  background: rgba(67, 233, 123, 0.22);
+  border: 2px solid #43e97b;
+  color: #0b5a26;
+}
+.result-box.fail {
+  background: rgba(255, 8, 68, 0.1);
+  border: 2px solid #ff0844;
+  color: #9b0000;
+}
+
+@keyframes popIn {
+  from { opacity: 0; transform: scale(0.94); }
+  to { opacity: 1; transform: scale(1); }
+}
 
 /* 하단 토스트 */
 .toast {
@@ -283,25 +327,22 @@ body {
 
     <!-- 등록 카드 -->
     <div class="glass-card step-card">
+      <div class="card-title">📝 신규 매물 등록</div>
       <button class="btn-3d btn-yellow" onclick="sendCmd('register', this)">
         🚀 광고 등록 시작
       </button>
-      <div class="step-log-box">
-        <span class="step-log-icon">↪</span>
-        <span id="logText-2">대기 중...</span>
-      </div>
+      <div class="progress-log" id="progressLog-2"></div>
+      <div class="result-box hidden" id="resultBox-2"></div>
     </div>
 
     <!-- 갱신 카드 -->
     <div class="glass-card step-card">
+      <div class="card-title">⚡ 프리미엄 매물 갱신</div>
       <div class="row-btns">
         <button class="btn-3d btn-green" onclick="sendCmd('refresh_start', this)">🔄 갱신 켜기(ON)</button>
         <button class="btn-3d btn-red" onclick="sendCmd('refresh_stop', this)">⏹ 끄기(OFF)</button>
       </div>
-      <div class="step-log-box">
-        <span class="step-log-icon">↪</span>
-        <span id="logText-3">대기 중...</span>
-      </div>
+      <div class="progress-log" id="progressLog-3"></div>
     </div>
 
   </div> <!-- mainView 끝 -->
@@ -316,15 +357,51 @@ let userId = null;
 let statusSource = null;
 let logSource = null;
 
+// 단계별 진행 로그 큐 (최대 3줄)
+const progressQueues = { 2: [], 3: [] };
+
+// 진행 메시지 추가 (위로 올라가며 오래된 건 흐려짐)
+function addProgressLog(step, msg, type = 'normal') {
+  const q = progressQueues[step];
+  q.unshift({ msg, type });
+  if (q.length > 3) q.pop();
+  const c = document.getElementById(`progressLog-${step}`);
+  if (!c) return;
+  const classes = ['', 'mid', 'old'];
+  c.innerHTML = q.map((item, i) => {
+    const cls = classes[i] || 'old';
+    const color = item.type === 'error' ? '#9b0000' : item.type === 'done' ? '#0b5a26' : '#444';
+    return `<div class="log-line ${cls}" style="color:${color}">↪ ${item.msg}</div>`;
+  }).join('');
+}
+
+// 최종 결과 표시 (성공=초록, 실패=빨강)
+function showResult(step, msg, isSuccess) {
+  const box = document.getElementById(`resultBox-${step}`);
+  if (!box) return;
+  box.className = `result-box ${isSuccess ? 'success' : 'fail'}`;
+  box.innerHTML = `${isSuccess ? '✅' : '❌'} ${msg}`;
+  box.classList.remove('hidden');
+  // 진행 로그 비우기
+  progressQueues[step] = [];
+  const c = document.getElementById(`progressLog-${step}`);
+  if (c) c.innerHTML = '';
+}
+
+// 단계 초기화 (새 작업 시작 or 로그아웃)
+function resetStep(step) {
+  progressQueues[step] = [];
+  const c = document.getElementById(`progressLog-${step}`);
+  if (c) c.innerHTML = '';
+  const box = document.getElementById(`resultBox-${step}`);
+  if (box) box.classList.add('hidden');
+}
+
 window.addEventListener('DOMContentLoaded', () => {
   const saved = localStorage.getItem('oiljang_user_id');
-  if (saved) {
-    userId = saved;
-    showMain();
-  }
-  
+  if (saved) { userId = saved; showMain(); }
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('sw.js').catch(err => console.log('SW init fail'));
+    navigator.serviceWorker.register('sw.js').catch(() => {});
   }
 });
 
@@ -341,12 +418,10 @@ function doLogout() {
   localStorage.removeItem('oiljang_user_id');
   userId = null;
   stopListeners();
-  
   document.getElementById('loginView').classList.remove('hidden');
   document.getElementById('mainView').classList.add('hidden');
   document.getElementById('headerUserInfo').classList.add('hidden');
-  
-  [2,3].forEach(n => { const el = document.getElementById(`logText-${n}`); if(el) el.textContent = '대기 중...'; });
+  [2, 3].forEach(n => resetStep(n));
 }
 
 function showMain() {
@@ -354,18 +429,14 @@ function showMain() {
   document.getElementById('mainView').classList.remove('hidden');
   document.getElementById('headerUserInfo').classList.remove('hidden');
   document.getElementById('displayId').textContent = userId;
-  // 캐시 잔상 제거: 로그 텍스트 초기화
-  [2,3].forEach(n => {
-    const el = document.getElementById(`logText-${n}`);
-    if(el) { el.textContent = '대기 중...'; el.style.opacity = '1'; }
-  });
+  [2, 3].forEach(n => resetStep(n));
   startListeners();
 }
 
-// Firebase 감시
+// Firebase 실시간 감시
 function startListeners() {
   stopListeners();
-  
+
   statusSource = new EventSource(`${DB_URL}/users/${userId}/status.json`);
   statusSource.addEventListener('put', (e) => {
     const data = JSON.parse(e.data);
@@ -379,24 +450,25 @@ function startListeners() {
       const msg = data.data.message;
       const step = data.data.step || 0;
 
-      // 단계별 로그 업데이트
-      if(step >= 1 && step <= 3) {
-        let el = document.getElementById(`logText-${step}`);
-        if(el) el.innerHTML = `<b style="color:#0050d2;">⚡ ${msg}</b>`;
+      if (step === 2) {
+        // 2단계 진행 중 메시지 → 로그에 추가
+        addProgressLog(2, msg);
+      } else if (step === 3) {
+        // 3단계 진행 중 메시지 → 로그에 추가
+        addProgressLog(3, msg);
       } else {
-        // step 없으면 최근 활성 단계 추정 (완료/에러 메시지)
+        // step 없음 = 최종 결과
         if (msg.includes('등록')) {
-          let el = document.getElementById('logText-2');
-          if(el) el.innerHTML = `<b style="color:#0050d2;">⚡ ${msg}</b>`;
+          showResult(2, msg, !msg.includes('실패'));
         } else if (msg.includes('갱신')) {
-          let el = document.getElementById('logText-3');
-          if(el) el.innerHTML = `<b style="color:#0050d2;">⚡ ${msg}</b>`;
+          addProgressLog(3, msg, msg.includes('실패') ? 'error' : 'done');
         }
       }
     }
   });
 
-  fetchLogsAndDistribute(); 
+  // 앱 열 때 최근 로그로 초기 상태 복원
+  fetchLogsAndDistribute();
   logSource = new EventSource(`${DB_URL}/users/${userId}/log.json?orderBy="timestamp"&limitToLast=20`);
   logSource.addEventListener('patch', fetchLogsAndDistribute);
 }
@@ -407,65 +479,58 @@ function stopListeners() {
 }
 
 function updatePcBadge(isOnline) {
-  const dot = document.getElementById('pcDot');
-  const txt = document.getElementById('pcStatusText');
-  if (isOnline) {
-    dot.className = 'dot online';
-    txt.textContent = 'PC 오토봇 켜짐';
-  } else {
-    dot.className = 'dot';
-    txt.textContent = 'PC 꺼짐';
-  }
+  document.getElementById('pcDot').className = isOnline ? 'dot online' : 'dot';
+  document.getElementById('pcStatusText').textContent = isOnline ? 'PC 오토봇 켜짐' : 'PC 꺼짐';
 }
 
+// 앱 열 때 최근 결과로 초기 상태 복원
 function fetchLogsAndDistribute() {
   fetch(`${DB_URL}/users/${userId}/log.json?orderBy="timestamp"&limitToLast=30`)
     .then(r => r.json())
     .then(data => {
-      if(!data) return;
+      if (!data) return;
       const entries = Object.values(data).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
-      let log1 = "", log2 = "", log3 = "";
-      
+      let foundReg = false, foundRef = false;
       for (let item of entries) {
-        let text = item.message;
+        const text = item.message;
         if (!text) continue;
-        if (!log1 && text.includes("스크래핑")) log1 = text;
-        if (!log2 && text.includes("등록")) log2 = text;
-        if (!log3 && (text.includes("갱신") || text.includes("운영시간"))) log3 = text;
-        if(log1 && log2 && log3) break;
+        if (!foundReg && text.includes('등록')) {
+          showResult(2, text, !text.includes('실패'));
+          foundReg = true;
+        }
+        if (!foundRef && (text.includes('갱신') || text.includes('운영시간'))) {
+          addProgressLog(3, text, text.includes('실패') ? 'error' : 'done');
+          foundRef = true;
+        }
+        if (foundReg && foundRef) break;
       }
-      
-      if (log2) { let el = document.getElementById('logText-2'); if(el) el.textContent = log2; }
-      if (log3) { let el = document.getElementById('logText-3'); if(el) el.textContent = log3; }
     })
     .catch(console.error);
 }
 
 async function sendCmd(type, btnObj) {
-  if(btnObj) {
+  if (btnObj) {
     btnObj.style.transform = 'scale(0.9)';
     setTimeout(() => { btnObj.style.transform = 'scale(1)'; }, 150);
     btnObj.disabled = true;
   }
+  // 등록 버튼 누르면 이전 결과 초기화
+  if (type === 'register') resetStep(2);
 
-  const cmdNames = { scrape_quick: '신규 스캔', scrape_full: '전체 스캔', register: '등록 시작', refresh_start: '엔진 가동', refresh_stop: '엔진 중지' };
-
+  const cmdNames = { register: '등록 시작', refresh_start: '갱신 켜기', refresh_stop: '갱신 끄기' };
   try {
     const resp = await fetch(`${DB_URL}/users/${userId}/command.json`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type: type, active: true, timestamp: { '.sv': 'timestamp' } })
+      body: JSON.stringify({ type, active: true, timestamp: { '.sv': 'timestamp' } })
     });
-    if (resp.ok) showToast(`명령어 발송 완료! (${cmdNames[type]})`);
+    if (resp.ok) showToast(`명령어 발송 완료! (${cmdNames[type] || type})`);
     else showToast('⚠️ 발송 실패. 다시 시도해주세요.');
   } catch (e) {
     showToast('⚠️ 연결이 불안정합니다. 인터넷 확인해주세요.');
   }
-
-  if(btnObj) setTimeout(() => btnObj.disabled = false, 1500);
+  if (btnObj) setTimeout(() => btnObj.disabled = false, 1500);
 }
-
-
 
 function openSheet() {
   if (window.currentSheetUrl) {
