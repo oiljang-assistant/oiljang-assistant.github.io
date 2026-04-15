@@ -1,5 +1,5 @@
-const CACHE_NAME = 'oiljang-remote-v2';
-const URLS_TO_CACHE = ['/', '/index.html', '/icon-192.png', '/icon-512.png', '/manifest.json'];
+const CACHE_NAME = 'oiljang-basic-remote-v1';
+const URLS_TO_CACHE = ['/basic/', '/basic/index.html', '/basic/icon-192.png', '/basic/icon-512.png', '/basic/manifest.json'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE_NAME).then(c => c.addAll(URLS_TO_CACHE)));
