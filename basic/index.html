@@ -298,9 +298,13 @@ body {
     <!-- 등록 카드 -->
     <div class="glass-card step-card">
       <div class="card-title">📝 2단계: 신규 매물 등록</div>
-      <button class="btn-3d btn-yellow" onclick="sendCmd('register', this)">
+      <button id="mainRegisterBtn" class="btn-3d btn-yellow" onclick="sendCmd('register', this)">
         🚀 광고 등록 시작
       </button>
+      <div id="retryBox" class="row-btns hidden" style="margin-top:10px;">
+        <button class="btn-3d btn-red" style="font-size:17px; padding:16px;" onclick="retryRegister()">🔄 <span id="retryFailText"></span> 재시도</button>
+        <button class="btn-3d btn-gray" style="font-size:17px; padding:16px;" onclick="document.getElementById('retryBox').classList.add('hidden')">✕ 닫기</button>
+      </div>
       <div class="step-log-box" id="logText-2">대기 중...</div>
     </div>
 
@@ -354,6 +358,8 @@ function showMain() {
 
 let _pollTimer = null;
 let _lastStatusTs = 0;
+let _registerBtn = null;
+let _scanBtns = [];
 
 function startListeners() {
   stopListeners();
@@ -406,11 +412,23 @@ function pollStatus() {
       } else {
         // step 없음 = 최종 결과 → 성공/실패 색상 구분
         if (msg.includes('스캔')) {
+          _scanBtns.forEach(b => { b.disabled = false; });
+          _scanBtns = [];
           const el = document.getElementById('logText-1');
           const color = msg.includes('실패') ? '#cc0000' : '#0a7c3e';
           const icon = msg.includes('실패') ? '❌' : '✅';
           if (el) el.innerHTML = `<b style="color:${color};">${icon} ${msg}</b>`;
         } else if (msg.includes('등록')) {
+          if (_registerBtn) {
+            _registerBtn.disabled = false;
+            _registerBtn = null;
+            const match = msg.match(/등록 완료: (\d+)\/(\d+)건 성공/);
+            if (match && parseInt(match[1]) < parseInt(match[2])) {
+              const failed = parseInt(match[2]) - parseInt(match[1]);
+              document.getElementById('retryFailText').textContent = `${failed}건 실패`;
+              document.getElementById('retryBox').classList.remove('hidden');
+            }
+          }
           const el = document.getElementById('logText-2');
           const color = msg.includes('실패') ? '#cc0000' : '#0a7c3e';
           const icon = msg.includes('실패') ? '❌' : '✅';
@@ -466,7 +484,28 @@ async function sendCmd(type, btnObj) {
   } catch (e) {
     showToast('⚠️ 연결이 불안정합니다. 인터넷 확인해주세요.');
   }
-  if (btnObj) setTimeout(() => btnObj.disabled = false, 1500);
+  if (type === 'register') {
+    _registerBtn = btnObj;
+  } else if (type === 'scan' || type === 'scan_full') {
+    if (btnObj) _scanBtns.push(btnObj);
+  } else {
+    if (btnObj) setTimeout(() => btnObj.disabled = false, 1500);
+  }
+}
+
+function retryRegister() {
+  document.getElementById('retryBox').classList.add('hidden');
+  const mainBtn = document.getElementById('mainRegisterBtn');
+  mainBtn.disabled = true;
+  _registerBtn = mainBtn;
+  fetch(`${DB_URL}/users/${userId}/command.json`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ type: 'register', active: true, timestamp: { '.sv': 'timestamp' } })
+  }).then(r => {
+    if (r.ok) showToast('등록 재시도 명령 발송!');
+    else showToast('⚠️ 발송 실패. 다시 시도해주세요.');
+  }).catch(() => showToast('⚠️ 연결이 불안정합니다.'));
 }
 
 function openSheet() {
