@@ -314,17 +314,65 @@ body {
 <!-- 토스트 -->
 <div class="toast" id="toast"></div>
 
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js";
+import { getAuth, signInAnonymously, onIdTokenChanged } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-auth.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyDgGrQxVz7m271sC0Tif9AiidlkFRsqyzU",
+  authDomain: "oiljang-firebase.firebaseapp.com",
+  databaseURL: "https://oiljang-firebase-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "oiljang-firebase",
+  storageBucket: "oiljang-firebase.firebasestorage.app",
+  messagingSenderId: "26314503296",
+  appId: "1:26314503296:web:ab993737b5d8db863c2265"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+
+window.__firebaseAuthReady = new Promise((resolve) => {
+  let resolved = false;
+  onIdTokenChanged(auth, async (user) => {
+    if (user) {
+      try {
+        const token = await user.getIdToken();
+        window.__firebaseAuthToken = token;
+        window.dispatchEvent(new CustomEvent('firebase-token-refreshed', { detail: token }));
+        if (!resolved) { resolved = true; resolve(token); }
+      } catch (e) { console.error('getIdToken failed', e); }
+    } else {
+      try { await signInAnonymously(auth); }
+      catch (e) { console.error('Anonymous sign-in failed', e); }
+    }
+  });
+});
+</script>
+
 <script>
 const DB_URL = 'https://oiljang-firebase-default-rtdb.asia-southeast1.firebasedatabase.app';
 let userId = null;
 let statusSource = null;
 let logSource = null;
 
-window.addEventListener('DOMContentLoaded', () => {
-  const saved = localStorage.getItem('oiljang_user_id');
-  if (saved) { userId = saved; showMain(); }
+function withAuth(url) {
+  const t = window.__firebaseAuthToken;
+  if (!t) return url;
+  return url + (url.includes('?') ? '&' : '?') + 'auth=' + encodeURIComponent(t);
+}
+
+window.addEventListener('DOMContentLoaded', async () => {
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js').catch(() => {});
+  }
+  try { await window.__firebaseAuthReady; } catch (e) {}
+  const saved = localStorage.getItem('oiljang_user_id');
+  if (saved) { userId = saved; showMain(); }
+});
+
+window.addEventListener('firebase-token-refreshed', () => {
+  if (userId && (statusSource || logSource)) {
+    startListeners();
   }
 });
 
@@ -365,7 +413,7 @@ function startListeners() {
   stopListeners();
 
   // PC 온/오프 + 시트URL — SSE
-  statusSource = new EventSource(`${DB_URL}/users/${userId}/status.json`);
+  statusSource = new EventSource(withAuth(`${DB_URL}/users/${userId}/status.json`));
   statusSource.addEventListener('put', (e) => {
     try {
       const data = JSON.parse(e.data);
@@ -380,7 +428,7 @@ function startListeners() {
 
   // 최근 로그 복원
   fetchLogsAndDistribute();
-  logSource = new EventSource(`${DB_URL}/users/${userId}/log.json?orderBy="timestamp"&limitToLast=20`);
+  logSource = new EventSource(withAuth(`${DB_URL}/users/${userId}/log.json?orderBy="timestamp"&limitToLast=20`));
   logSource.addEventListener('patch', fetchLogsAndDistribute);
 }
 
@@ -392,7 +440,7 @@ function stopListeners() {
 
 // 2초마다 Firebase status 조회 → logText에 바로 표시
 function pollStatus() {
-  fetch(`${DB_URL}/users/${userId}/status.json`)
+  fetch(withAuth(`${DB_URL}/users/${userId}/status.json`))
     .then(r => r.json())
     .then(data => {
       if (!data || !data.message) return;
@@ -446,7 +494,7 @@ function updatePcBadge(isOnline) {
 
 // 앱 열 때 최근 로그로 마지막 결과 복원
 function fetchLogsAndDistribute() {
-  fetch(`${DB_URL}/users/${userId}/log.json?orderBy="timestamp"&limitToLast=30`)
+  fetch(withAuth(`${DB_URL}/users/${userId}/log.json?orderBy="timestamp"&limitToLast=30`))
     .then(r => r.json())
     .then(data => {
       if (!data) return;
@@ -474,7 +522,8 @@ async function sendCmd(type, btnObj) {
 
   const cmdNames = { scan: '빠른 스캔', scan_full: '전체 스캔', register: '등록 시작' };
   try {
-    const resp = await fetch(`${DB_URL}/users/${userId}/command.json`, {
+    try { await window.__firebaseAuthReady; } catch (e) {}
+    const resp = await fetch(withAuth(`${DB_URL}/users/${userId}/command.json`), {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ type, active: true, timestamp: { '.sv': 'timestamp' } })
@@ -498,7 +547,7 @@ function retryRegister() {
   const mainBtn = document.getElementById('mainRegisterBtn');
   mainBtn.disabled = true;
   _registerBtn = mainBtn;
-  fetch(`${DB_URL}/users/${userId}/command.json`, {
+  fetch(withAuth(`${DB_URL}/users/${userId}/command.json`), {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ type: 'register', active: true, timestamp: { '.sv': 'timestamp' } })
