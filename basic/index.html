@@ -330,6 +330,7 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
+window.__firebaseAuth = auth;  // sendCmd에서 currentUser.getIdToken(true) 호출용
 
 window.__firebaseAuthReady = new Promise((resolve) => {
   let resolved = false;
@@ -521,13 +522,26 @@ async function sendCmd(type, btnObj) {
   }
 
   const cmdNames = { scan: '빠른 스캔', scan_full: '전체 스캔', register: '등록 시작' };
+  const _url = `${DB_URL}/users/${userId}/command.json`;
+  const _opts = {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ type, active: true, timestamp: { '.sv': 'timestamp' } })
+  };
   try {
     try { await window.__firebaseAuthReady; } catch (e) {}
-    const resp = await fetch(withAuth(`${DB_URL}/users/${userId}/command.json`), {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type, active: true, timestamp: { '.sv': 'timestamp' } })
-    });
+    // 1차 시도: 캐시된 토큰
+    let resp = await fetch(withAuth(_url), _opts);
+    // 401 (토큰 만료) → 강제 갱신 후 1회 재시도
+    if (resp.status === 401) {
+      try {
+        const u = window.__firebaseAuth && window.__firebaseAuth.currentUser;
+        if (u) {
+          window.__firebaseAuthToken = await u.getIdToken(true);
+          resp = await fetch(withAuth(_url), _opts);
+        }
+      } catch (e) {}
+    }
     if (resp.ok) showToast(`명령어 발송 완료! (${cmdNames[type] || type})`);
     else showToast('⚠️ 발송 실패. 다시 시도해주세요.');
   } catch (e) {

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'oiljang-remote-v2';
+const CACHE_NAME = 'oiljang-remote-v3';  // 2026-05-15 Firebase 토큰 갱신 fix
 const URLS_TO_CACHE = ['/', '/index.html', '/icon-192.png', '/icon-512.png', '/manifest.json'];
 
 self.addEventListener('install', e => {
