@@ -304,6 +304,9 @@ body {
       <button id="mainRegisterBtn" class="btn-3d btn-yellow" onclick="sendCmd('register', this)">
         📝 수동 등록 시작
       </button>
+      <button class="btn-3d btn-red" style="margin-top:10px; padding:18px; font-size:18px;" onclick="sendCmd('stop', this)">
+        ⏹ 등록 중단
+      </button>
       <div id="retryBox" class="row-btns hidden" style="margin-top:10px;">
         <button class="btn-3d btn-red" style="font-size:17px; padding:16px;" onclick="retryRegister()">🔄 <span id="retryFailText"></span> 재시도</button>
         <button class="btn-3d btn-gray" style="font-size:17px; padding:16px;" onclick="document.getElementById('retryBox').classList.add('hidden')">✕ 닫기</button>
@@ -524,7 +527,7 @@ async function sendCmd(type, btnObj) {
     btnObj.disabled = true;
   }
 
-  const cmdNames = { scan: '빠른 스캔', scan_full: '전체 스캔', register: '수동 등록', auto_register: '자동 등록' };
+  const cmdNames = { scan: '빠른 스캔', scan_full: '전체 스캔', register: '수동 등록', auto_register: '자동 등록', stop: '등록 중단' };
   const _url = `${DB_URL}/users/${userId}/command.json`;
   const _opts = {
     method: 'PUT',
