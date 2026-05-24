@@ -553,7 +553,7 @@ async function sendCmd(type, btnObj) {
   } catch (e) {
     showToast('⚠️ 연결이 불안정합니다. 인터넷 확인해주세요.');
   }
-  if (type === 'register') {
+  if (type === 'register' || type === 'auto_register') {
     _registerBtn = btnObj;
   } else if (type === 'scan' || type === 'scan_full') {
     if (btnObj) _scanBtns.push(btnObj);

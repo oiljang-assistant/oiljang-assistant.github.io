@@ -569,7 +569,7 @@ async function sendCmd(type, btnObj) {
   } catch (e) {
     showToast('⚠️ 연결이 불안정합니다. 인터넷 확인해주세요.');
   }
-  if (type === 'register') {
+  if (type === 'register' || type === 'auto_register') {
     _registerBtn = btnObj; // pollStatus에서 완료 시 재활성화
   } else {
     if (btnObj) setTimeout(() => btnObj.disabled = false, 1500);
