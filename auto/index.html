@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="ko" translate="no">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
+<meta name="google" content="notranslate">
+<meta http-equiv="Content-Language" content="ko">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#f7a93b">
+<link rel="apple-touch-icon" href="../icon-192.png">
+<link rel="manifest" href="manifest.json">
+<title>오일장 자동등록</title>
+<link rel="stylesheet" as="style" crossorigin
+      href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.8/dist/web/static/pretendard.css">
+<style>
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box;
+                         font-family: 'Pretendard', -apple-system, sans-serif; }
+body {
+  background: linear-gradient(-45deg, #e0f7fa, #4facfe, #00f2fe, #ffecd2, #fcb69f);
+  background-size: 400% 400%;
+  animation: gradientBG 15s ease infinite;
+  min-height: 100vh;
+  color: #1a1a1a;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+}
+@keyframes gradientBG {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+.container { width: 100%; max-width: 480px; min-height: 100vh; padding: 18px 14px;
+             display: flex; flex-direction: column; gap: 12px; }
+.card { background: rgba(255,255,255,0.94); border-radius: 18px; padding: 16px;
+        box-shadow: 0 4px 18px rgba(0,0,0,0.08); }
+h1 { font-size: 22px; font-weight: 700; text-align: center; }
+.hint { text-align: center; color: #666; font-size: 13px; margin-top: 4px; }
+.section-title { font-size: 13px; font-weight: 700; color: #555; margin-bottom: 8px; }
+.row { display: flex; align-items: center; gap: 10px; }
+input[type=text] {
+  flex: 1; padding: 12px 14px; font-size: 16px; border: 1px solid #ddd;
+  border-radius: 12px; outline: none;
+}
+input[type=text]:focus { border-color: #f7a93b; }
+input[type=range] { flex: 1; }
+button {
+  padding: 12px 14px; font-size: 15px; font-weight: 600; color: #fff;
+  background: #f7a93b; border: none; border-radius: 12px; cursor: pointer;
+  white-space: nowrap;
+}
+button:hover { background: #e09730; }
+button:disabled { background: #ccc; cursor: not-allowed; }
+button.secondary { background: #888; }
+button.secondary:hover:not(:disabled) { background: #666; }
+button.danger { background: #d9534f; }
+button.danger:hover:not(:disabled) { background: #c9302c; }
+button.fullwidth { width: 100%; }
+
+#status-card { display: none; }
+#status-card.active { display: block; }
+.status-msg { font-size: 15px; font-weight: 600; margin-bottom: 6px; }
+.status-current { font-size: 13px; color: #555; margin-bottom: 8px;
+                  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.progress-row { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #444; }
+progress { flex: 1; height: 10px; border-radius: 5px; }
+
+.listings { max-height: 380px; overflow-y: auto; }
+.matter { display: flex; align-items: center; gap: 8px; padding: 6px 4px;
+          border-bottom: 1px solid #eee; font-size: 13px; }
+.matter:last-child { border-bottom: none; }
+.matter input[type=checkbox] { width: 18px; height: 18px; accent-color: #f7a93b; }
+.matter .idx { min-width: 24px; color: #888; font-size: 12px; }
+.matter .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.matter .badge { font-size: 11px; padding: 2px 6px; border-radius: 8px; }
+.matter .badge.보류 { background: #ddd; color: #555; }
+.matter .badge.진행중 { background: #d4ecdc; color: #2a6b3f; }
+.matter .check-icon { font-size: 14px; }
+.matter.done { opacity: 0.6; }
+
+.log { max-height: 220px; overflow-y: auto; font-size: 12px; line-height: 1.6;
+       background: rgba(0,0,0,0.04); padding: 10px; border-radius: 10px;
+       white-space: pre-wrap; word-break: break-all; }
+.options-row { display: flex; align-items: center; gap: 12px; padding: 6px 0;
+               font-size: 13px; color: #444; }
+.options-row label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+.options-row input[type=checkbox] { width: 16px; height: 16px; accent-color: #f7a93b; }
+.retry-row { display: flex; align-items: center; gap: 10px; padding: 4px 0;
+             font-size: 13px; color: #444; }
+.bottom-bar { display: flex; gap: 8px; }
+.bottom-bar button { flex: 1; }
+.summary { font-size: 13px; color: #555; padding: 6px 0; }
+.summary b { color: #1a1a1a; }
+.toast { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
+         background: rgba(0,0,0,0.78); color: #fff; padding: 10px 18px;
+         border-radius: 22px; font-size: 13px; opacity: 0; pointer-events: none;
+         transition: opacity 0.2s; z-index: 100; }
+.toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<!-- 로그인 -->
+<div class="card" id="login-card">
+  <h1>🏠 오일장 자동등록</h1>
+  <div class="hint" style="margin: 14px 0;">오일장 ID 를 입력하면<br>PC 에서 등록 작업 진행상황을<br>실시간으로 보고 명령할 수 있어요.</div>
+  <div class="row">
+    <input type="text" id="input-id" placeholder="오일장 ID" autocomplete="off">
+    <button onclick="doLogin()">시작</button>
+  </div>
+</div>
+
+<!-- 메인 -->
+<div id="main-view" style="display:none;">
+
+  <div class="card">
+    <h1>🏠 오일장 자동등록</h1>
+    <div class="hint" id="userInfo"></div>
+  </div>
+
+  <!-- 진행상황 -->
+  <div class="card" id="status-card">
+    <div class="section-title">📡 진행상황</div>
+    <div class="status-msg" id="status-msg">대기 중</div>
+    <div class="status-current" id="status-current"></div>
+    <div class="progress-row">
+      <progress id="status-progress" value="0" max="100"></progress>
+      <span id="status-counter">0/0</span>
+    </div>
+    <div style="margin-top: 10px;">
+      <button class="danger fullwidth" id="btn-stop" onclick="doStop()" style="display:none;">🛑 안전 중지</button>
+    </div>
+  </div>
+
+  <!-- 매물 목록 + 체크 -->
+  <div class="card">
+    <div class="section-title">📋 매물 목록 (체크하면 등록 대상)</div>
+    <div id="listings" class="listings">아직 매물이 없어요.<br>PC 에서 "매물 불러오기" 를 먼저 눌러주세요.</div>
+    <div class="summary" id="summary"></div>
+  </div>
+
+  <!-- 옵션 + 시작 -->
+  <div class="card" id="action-card">
+    <div class="options-row">
+      <label><input type="checkbox" id="opt-delete-old" checked> 등록 후 옛 매물 자동 삭제</label>
+    </div>
+    <div class="retry-row">
+      <span>실패 시 재시도: <b id="retry-label">1</b>회</span>
+      <input type="range" id="opt-retry" min="0" max="2" value="1" oninput="document.getElementById('retry-label').textContent=this.value">
+    </div>
+    <button class="fullwidth" id="btn-start" onclick="doStart()">🚀 선택 매물 등록 시작</button>
+  </div>
+
+  <!-- 로그 -->
+  <div class="card">
+    <div class="section-title">📜 로그</div>
+    <div id="log" class="log">대기 중...</div>
+  </div>
+
+  <!-- 하단 -->
+  <div class="bottom-bar">
+    <button class="secondary" onclick="doLogout()">로그아웃</button>
+  </div>
+
+</div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js";
+import { getDatabase, ref, onValue, set, update, off, query, limitToLast }
+  from "https://www.gstatic.com/firebasejs/10.13.2/firebase-database.js";
+import { getAuth, signInAnonymously, onAuthStateChanged }
+  from "https://www.gstatic.com/firebasejs/10.13.2/firebase-auth.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyDgGrQxVz7m271sC0Tif9AiidlkFRsqyzU",
+  authDomain: "oiljang-firebase.firebaseapp.com",
+  databaseURL: "https://oiljang-firebase-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "oiljang-firebase",
+  storageBucket: "oiljang-firebase.firebasestorage.app",
+  messagingSenderId: "26314503296",
+  appId: "1:26314503296:web:ab993737b5d8db863c2265"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+const auth = getAuth(app);
+
+let userId = null;
+let listenersAttached = false;
+let listingsCache = [];          // 마지막 받은 매물 목록 (체크 토글 시 매번 다시 그릴 때 참조)
+let selectedSet = new Set();     // 현재 선택된 num 들 (로컬 + Firebase)
+let isBgRunning = false;         // 진행 중 여부 (true 면 체크/버튼 disabled)
+
+// 익명 로그인
+window.__authReady = new Promise((resolve) => {
+  let resolved = false;
+  onAuthStateChanged(auth, async (user) => {
+    if (user) { if (!resolved) { resolved = true; resolve(); } }
+    else { try { await signInAnonymously(auth); } catch (e) {} }
+  });
+});
+
+window.addEventListener('DOMContentLoaded', async () => {
+  await window.__authReady;
+  const saved = localStorage.getItem('oiljang_auto_id');
+  if (saved) { userId = saved; showMain(); attachListeners(); }
+});
+
+// 토스트
+function showToast(msg, ms=2000) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), ms);
+}
+
+// 로그인
+window.doLogin = async function () {
+  const id = document.getElementById('input-id').value.trim();
+  if (!id) { showToast('오일장 ID 를 입력해주세요.'); return; }
+  await window.__authReady;
+  userId = id;
+  localStorage.setItem('oiljang_auto_id', id);
+  showMain();
+  attachListeners();
+};
+
+window.doLogout = function () {
+  detachListeners();
+  localStorage.removeItem('oiljang_auto_id');
+  userId = null;
+  document.getElementById('login-card').style.display = 'block';
+  document.getElementById('main-view').style.display = 'none';
+};
+
+function showMain() {
+  document.getElementById('login-card').style.display = 'none';
+  document.getElementById('main-view').style.display = 'block';
+  document.getElementById('userInfo').textContent = userId + ' 님';
+}
+
+function attachListeners() {
+  if (listenersAttached || !userId) return;
+  // 매물 목록
+  onValue(ref(db, `users/${userId}/auto/listings`), (snap) => {
+    listingsCache = snap.val() || [];
+    renderListings();
+  });
+  // 상태 (진행 중 / done 등)
+  onValue(ref(db, `users/${userId}/auto/status`), (snap) => {
+    renderStatus(snap.val() || {});
+  });
+  // 로그 (최근 100)
+  onValue(query(ref(db, `users/${userId}/auto/log`), limitToLast(100)), (snap) => {
+    const items = [];
+    snap.forEach(c => items.push(c.val()));
+    renderLog(items);
+  });
+  // 선택 상태 (PC 와 동기화)
+  onValue(ref(db, `users/${userId}/auto/selected`), (snap) => {
+    const sel = snap.val() || [];
+    selectedSet = new Set(sel.map(String));
+    renderListings();  // 체크박스 다시 그림
+    updateSummary();
+  });
+  listenersAttached = true;
+}
+
+function detachListeners() {
+  // 단순화: 페이지 reload 로 가도록 — Firebase 자동 정리
+  listenersAttached = false;
+  selectedSet = new Set();
+  listingsCache = [];
+}
+
+function renderListings() {
+  const root = document.getElementById('listings');
+  const arr = Array.isArray(listingsCache) ? listingsCache : Object.values(listingsCache);
+  if (!arr || arr.length === 0) {
+    root.innerHTML = '아직 매물이 없어요.<br>PC 에서 "매물 불러오기" 를 먼저 눌러주세요.';
+    updateSummary();
+    return;
+  }
+  root.innerHTML = arr.map((l, i) => {
+    const num = String(l.num);
+    const checked = selectedSet.has(num) ? 'checked' : '';
+    return `
+      <div class="matter">
+        <span class="idx">${i + 1}</span>
+        <input type="checkbox" data-num="${num}" ${checked} ${isBgRunning ? 'disabled' : ''} onchange="toggleSelect('${num}', this.checked)">
+        <span class="name">${escapeHtml(l.name || '(이름 없음)')}</span>
+        <span class="badge ${l.status === '보류' ? '보류' : '진행중'}">${l.status || ''}</span>
+      </div>
+    `;
+  }).join('');
+  updateSummary();
+}
+
+function updateSummary() {
+  const total = (Array.isArray(listingsCache) ? listingsCache : Object.values(listingsCache)).length;
+  const selCount = selectedSet.size;
+  document.getElementById('summary').innerHTML = `체크: <b>${selCount}개</b> / 전체 ${total}개`;
+  const startBtn = document.getElementById('btn-start');
+  startBtn.textContent = `🚀 선택 매물 ${selCount}개 등록 시작`;
+  startBtn.disabled = isBgRunning || selCount === 0;
+}
+
+window.toggleSelect = async function(num, checked) {
+  if (isBgRunning) return;
+  if (checked) selectedSet.add(num);
+  else selectedSet.delete(num);
+  // Firebase 에 반영 (PC 와 동기화)
+  try { await set(ref(db, `users/${userId}/auto/selected`), Array.from(selectedSet)); }
+  catch (e) { showToast('동기화 실패'); }
+  updateSummary();
+};
+
+function renderStatus(status) {
+  const msg = status.message || '';
+  const total = parseInt(status.total || 0);
+  const done = parseInt(status.done || 0);
+  // 진행 중 판정 — total>0 이고 done<total 이고 message 가 "완료" 아닌 경우
+  const wasRunning = isBgRunning;
+  isBgRunning = total > 0 && done < total && !(msg.includes('완료'));
+
+  const card = document.getElementById('status-card');
+  if (msg || total > 0) {
+    card.classList.add('active');
+  }
+  document.getElementById('status-msg').textContent = msg || '대기 중';
+  document.getElementById('status-current').textContent = status.current || '';
+  const pct = total > 0 ? Math.min(100, Math.round(done / total * 100)) : 0;
+  document.getElementById('status-progress').value = pct;
+  document.getElementById('status-progress').max = 100;
+  document.getElementById('status-counter').textContent = `${done}/${total}`;
+
+  document.getElementById('btn-stop').style.display = isBgRunning ? 'block' : 'none';
+  if (wasRunning !== isBgRunning) {
+    renderListings();  // 체크박스 disabled 갱신
+    updateSummary();
+  }
+}
+
+function renderLog(items) {
+  const root = document.getElementById('log');
+  if (!items || items.length === 0) {
+    root.textContent = '대기 중...';
+    return;
+  }
+  root.innerHTML = items.map(i => escapeHtml(i.message || '')).join('\n');
+  root.scrollTop = root.scrollHeight;
+}
+
+// 등록 시작 (PC 에게 명령)
+window.doStart = async function() {
+  if (selectedSet.size === 0) { showToast('매물을 먼저 체크해주세요.'); return; }
+  if (isBgRunning) { showToast('이미 진행 중이에요.'); return; }
+  const retry = parseInt(document.getElementById('opt-retry').value);
+  const deleteOld = document.getElementById('opt-delete-old').checked;
+  try {
+    // selected 가 이미 동기화돼있어야 함 (체크 시마다 자동 set 됨)
+    await set(ref(db, `users/${userId}/auto/command`), {
+      type: 'start',
+      active: true,
+      retry: retry,
+      delete_old: deleteOld,
+      timestamp: { '.sv': 'timestamp' }
+    });
+    showToast(`🚀 PC 에게 시작 명령 전송 — ${selectedSet.size}개 매물`);
+  } catch (e) {
+    showToast('명령 전송 실패: ' + e.message);
+  }
+};
+
+// 안전 중지
+window.doStop = async function() {
+  try {
+    await set(ref(db, `users/${userId}/auto/command`), {
+      type: 'stop',
+      active: true,
+      timestamp: { '.sv': 'timestamp' }
+    });
+    showToast('🛑 중지 명령 전송');
+  } catch (e) {
+    showToast('중지 실패: ' + e.message);
+  }
+};
+
+function escapeHtml(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+                  .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+</script>
+
+</body>
+</html>
