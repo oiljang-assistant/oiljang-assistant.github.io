@@ -239,11 +239,11 @@ input[type=range] { flex: 1; accent-color: var(--primary); }
     <div class="section-title" style="display:flex; justify-content:space-between; align-items:center;">
       <span>📋 매물 목록 — 체크하면 등록 대상</span>
       <button class="btn" id="btn-refresh" onclick="doRefresh()"
-              style="padding:6px 12px; font-size:13px; margin:0;">🔄 새로고침</button>
+              style="padding:6px 12px; font-size:13px; margin:0;">📋 매물 불러오기</button>
     </div>
     <div id="listings" class="listings">
       <p style="text-align:center; color:#888; padding:24px 0;">
-        아직 매물이 없어요.<br>"🔄 새로고침" 을 눌러 PC 에서 매물을 불러오세요.
+        아직 매물이 없어요.<br>"📋 매물 불러오기" 를 눌러 PC 에서 가져오세요.
       </p>
     </div>
     <div class="summary" id="summary">체크: <b>0개</b> / 전체 0개</div>
@@ -508,12 +508,12 @@ window.doStop = async function() {
 };
 
 window.doRefresh = async function() {
-  if (isBgRunning) { showToast('등록 진행 중 — 새로고침 안 됨'); return; }
+  if (isBgRunning) { showToast('등록 진행 중 — 매물 불러오기 안 됨'); return; }
   try {
     await set(ref(db, `users/${userId}/auto/command`), {
       type: 'refresh', active: true, timestamp: { '.sv': 'timestamp' }
     });
-    showToast('🔄 PC 에 매물 새로고침 요청 (30~60초)');
+    showToast('📋 PC 에 매물 불러오기 요청 (30~60초)');
   } catch (e) { showToast('실패: ' + e.message); }
 };
 
