@@ -306,12 +306,12 @@ let listenersAttached = false;
 let listingsCache = [];
 let selectedSet = new Set();
 let isBgRunning = false;
-let lastStatusTs = 0;
+let lastPresenceTs = 0;
 
-// PC 신호 (마지막 status timestamp 기준)
+// PC 신호 — PC 가 20초마다 push 하는 presence timestamp 기준
 function updatePcSignal() {
-  const ageSec = (Date.now() - lastStatusTs) / 1000;
-  const online = lastStatusTs > 0 && ageSec < 30;  // 30초 이내 갱신 = online
+  const ageSec = (Date.now() - lastPresenceTs) / 1000;
+  const online = lastPresenceTs > 0 && ageSec < 60;  // 60초 이내 = online (PC 20초 주기 + 여유)
   document.getElementById('pc-dot').className = 'dot ' + (online ? 'online' : 'offline');
   document.getElementById('pc-label').textContent = online ? 'PC 연결 됨' : 'PC 신호 없음';
 }
@@ -385,6 +385,14 @@ function attachListeners() {
     renderListings();
     updateSummary();
   });
+  // PC heartbeat — 20초마다 timestamp 갱신
+  onValue(ref(db, `users/${userId}/auto/presence/timestamp`), (snap) => {
+    const ts = snap.val();
+    if (typeof ts === 'number') {
+      lastPresenceTs = ts;
+      updatePcSignal();
+    }
+  });
   listenersAttached = true;
 }
 
@@ -440,10 +448,6 @@ function renderStatus(status) {
   const msg = status.message || '';
   const total = parseInt(status.total || 0);
   const done = parseInt(status.done || 0);
-  const ts = status.timestamp;
-  if (typeof ts === 'number') lastStatusTs = ts;
-  else lastStatusTs = Date.now();
-  updatePcSignal();
 
   const wasRunning = isBgRunning;
   isBgRunning = total > 0 && done < total && !(msg.includes('완료'));
