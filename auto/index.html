@@ -64,7 +64,7 @@ body {
 
 /* 글래스 카드 */
 .card {
-  background: rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.55);
   backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
   border-top: 1px solid rgba(255, 255, 255, 0.95);
   border-left: 1px solid rgba(255, 255, 255, 0.95);
@@ -75,6 +75,8 @@ body {
   margin-bottom: 14px;
   box-shadow: 0 10px 24px rgba(31, 38, 135, 0.08);
 }
+/* 매물 목록 카드는 더 밝게 — 글씨 가독성 우선 */
+.card.bright { background: rgba(255, 255, 255, 0.88); }
 .section-title { font-size: 13px; font-weight: 700; color: #444;
                  margin-bottom: 10px; letter-spacing: -0.2px; }
 
@@ -125,27 +127,27 @@ progress { flex: 1; height: 10px; border-radius: 5px; }
 progress::-webkit-progress-bar { background: rgba(0,0,0,0.08); border-radius: 5px; }
 progress::-webkit-progress-value { background: var(--primary); border-radius: 5px; transition: width 0.3s; }
 
-/* 매물 목록 */
-.listings { max-height: 360px; overflow-y: auto; padding: 4px 0; }
-.matter { display: flex; align-items: center; gap: 10px; padding: 8px 4px;
-          border-bottom: 1px solid rgba(0,0,0,0.06); font-size: 13px;
+/* 매물 목록 — 가독성 우선 (큰 글씨, 굵게) */
+.listings { max-height: 380px; overflow-y: auto; padding: 4px 0; }
+.matter { display: flex; align-items: center; gap: 10px; padding: 10px 4px;
+          border-bottom: 1px solid rgba(0,0,0,0.08); font-size: 15px;
           transition: background 0.15s; }
 .matter:last-child { border-bottom: none; }
-.matter:hover { background: rgba(255,255,255,0.4); }
+.matter:hover { background: rgba(0,0,0,0.02); }
 .matter input[type=checkbox] {
-  width: 20px; height: 20px; accent-color: var(--primary);
+  width: 22px; height: 22px; accent-color: var(--primary);
   flex-shrink: 0; cursor: pointer;
 }
-.matter .idx { min-width: 22px; color: #999; font-size: 12px;
-               font-variant-numeric: tabular-nums; }
+.matter .idx { min-width: 24px; color: #999; font-size: 13px;
+               font-variant-numeric: tabular-nums; font-weight: 600; }
 .matter .name { flex: 1; overflow: hidden; text-overflow: ellipsis;
-                white-space: nowrap; color: #222; }
+                white-space: nowrap; color: #111; font-weight: 600; font-size: 15px; }
 .matter .badge { font-size: 11px; padding: 3px 8px; border-radius: 10px;
-                 flex-shrink: 0; font-weight: 600; }
-.matter .badge.보류 { background: rgba(0,0,0,0.08); color: #666; }
-.matter .badge.진행중 { background: rgba(0,196,116,0.15); color: #0a8d4f; }
-.summary { font-size: 13px; color: #555; padding: 10px 4px 2px; text-align: right; }
-.summary b { color: #222; font-weight: 800; }
+                 flex-shrink: 0; font-weight: 700; }
+.matter .badge.보류 { background: rgba(0,0,0,0.1); color: #555; }
+.matter .badge.진행중 { background: rgba(0,196,116,0.18); color: #0a8d4f; }
+.summary { font-size: 14px; color: #444; padding: 10px 4px 2px; text-align: right; }
+.summary b { color: #111; font-weight: 800; }
 
 /* 옵션 */
 .options-row { display: flex; align-items: center; gap: 12px; padding: 4px 0;
@@ -226,8 +228,8 @@ input[type=range] { flex: 1; accent-color: var(--primary); }
     </div>
   </div>
 
-  <!-- 매물 목록 -->
-  <div class="card">
+  <!-- 매물 목록 (밝은 카드 — 가독성 우선) -->
+  <div class="card bright">
     <div class="section-title">📋 매물 목록 — 체크하면 등록 대상</div>
     <div id="listings" class="listings">
       <p style="text-align:center; color:#888; padding:24px 0;">
