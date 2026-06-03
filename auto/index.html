@@ -54,11 +54,14 @@ body {
           margin-bottom: 20px; }
 .title-box { display: flex; align-items: center; justify-content: center;
              gap: 12px; margin-bottom: 6px; }
-.title-box img { width: 48px; height: 48px; border-radius: 12px;
-                 box-shadow: 0 6px 14px rgba(0,0,0,0.15);
-                 border: 1px solid rgba(255,255,255,0.8); }
-.title-box h1 { font-size: 22px; font-weight: 800; color: #111;
-                letter-spacing: -0.5px; text-shadow: 0 1px 2px rgba(255,255,255,0.8); }
+.title-box h1 { font-size: 24px; font-weight: 800; color: #111;
+                letter-spacing: -0.5px; text-shadow: 0 1px 2px rgba(255,255,255,0.8);
+                display: flex; align-items: center; gap: 8px; }
+/* 야자수 (Twemoji SVG) — 박스/그림자 없이 통통한 일러스트만 */
+.palm-icon { width: 1.4em; height: 1.4em;
+             vertical-align: middle;
+             border-radius: 0; box-shadow: none; border: none;
+             background: transparent; flex-shrink: 0; }
 #userDisplay { font-size: 14px; font-weight: 700; color: #333;
                text-shadow: 0 1px 2px rgba(255,255,255,0.5); margin-top: 4px; }
 
@@ -239,7 +242,7 @@ input[type=range] { flex: 1; accent-color: var(--primary); }
 <div class="card" id="login-card">
   <div class="header">
     <div class="title-box">
-      <h1>🌴 오일장 비서</h1>
+      <h1><img src="https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/svg/1f334.svg" class="palm-icon" alt="🌴"> 오일장 비서</h1>
     </div>
   </div>
   <p style="text-align:center; font-size:14px; color:#555; line-height:1.6; margin:14px 0 20px;">
@@ -257,7 +260,7 @@ input[type=range] { flex: 1; accent-color: var(--primary); }
 
   <div class="header">
     <div class="title-box">
-      <h1>🌴 오일장 비서</h1>
+      <h1><img src="https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/svg/1f334.svg" class="palm-icon" alt="🌴"> 오일장 비서</h1>
     </div>
     <div id="userDisplay"></div>
     <div class="pc-badge">
