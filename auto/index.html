@@ -181,10 +181,14 @@ progress::-webkit-progress-value { background: var(--primary); border-radius: 5p
 .retry-row span { white-space: nowrap; }
 input[type=range] { flex: 1; accent-color: var(--primary); }
 
-/* 진행/로그 통합 영역 */
-.log { max-height: 360px; overflow-y: auto; font-size: 13px; line-height: 1.8;
-       background: rgba(0,0,0,0.04); padding: 12px 14px; border-radius: 12px;
+/* 진행/로그 통합 영역 — 매물 목록처럼 명확한 스크롤 */
+.log { max-height: 500px; min-height: 140px; overflow-y: auto;
+       -webkit-overflow-scrolling: touch;
+       font-size: 14px; line-height: 1.7;
+       background: rgba(0,0,0,0.04); padding: 14px 16px; border-radius: 12px;
        white-space: pre-wrap; word-break: break-all; color: #222; }
+.log-line { padding: 4px 0; border-bottom: 1px solid rgba(0,0,0,0.05); }
+.log-line:last-child { border-bottom: none; }
 .log-line { padding: 2px 0; }
 .progress-mini { display: flex; align-items: center; gap: 10px; font-size: 14px;
                  color: #222; font-weight: 700; margin-bottom: 10px; }
