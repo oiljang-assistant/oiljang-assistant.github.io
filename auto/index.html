@@ -91,20 +91,43 @@ input[type=text] {
 }
 input[type=text]:focus { background: #fff; box-shadow: 0 0 0 2px var(--primary); }
 
-/* 버튼 */
-.btn { padding: 14px 18px; font-size: 15px; font-weight: 700; color: #fff;
-       background: var(--primary); border: none; border-radius: 14px;
-       cursor: pointer; box-shadow: 0 6px 14px rgba(247,169,59,0.3);
-       transition: all 0.15s; white-space: nowrap; }
-.btn:hover:not(:disabled), .btn:active:not(:disabled) { background: var(--primary-dark); transform: translateY(-1px); }
-.btn:disabled { background: #c4c4c4; cursor: not-allowed;
-                box-shadow: none; opacity: 0.6; }
-.btn.fullwidth { width: 100%; }
-.btn.danger { background: var(--danger); box-shadow: 0 6px 14px rgba(217,83,79,0.3); }
-.btn.danger:hover:not(:disabled), .btn.danger:active:not(:disabled) { background: #c9302c; }
-.btn.ghost { background: rgba(255,255,255,0.6); color: #444;
-             box-shadow: 0 4px 10px rgba(0,0,0,0.06); }
-.btn.ghost:hover, .btn.ghost:active { background: rgba(255,255,255,0.85); }
+/* 버튼 — 메인 비서앱 패턴: 3D 그라데이션 + 입체 shadow */
+.btn { padding: 18px 22px; font-size: 17px; font-weight: 800; color: #fff;
+       background: linear-gradient(135deg, #00c6ff 0%, #0072ff 100%);
+       border: none; border-radius: 16px;
+       cursor: pointer;
+       box-shadow: 0 8px 24px rgba(0, 114, 255, 0.3), inset 0 1px 0 rgba(255,255,255,0.4);
+       transition: all 0.15s cubic-bezier(0.2, 0.8, 0.2, 1);
+       white-space: nowrap;
+       text-shadow: 0 1px 2px rgba(0,0,0,0.2);
+       display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+.btn:active:not(:disabled) { transform: scale(0.97) translateY(2px); }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; box-shadow: none; }
+.btn.fullwidth { width: 100%; padding: 20px; font-size: 18px; }
+/* 빨강 — 중지/취소 (코랄) */
+.btn.danger {
+  background: linear-gradient(135deg, #ff0844 0%, #ffb199 100%);
+  box-shadow: 0 8px 24px rgba(255, 8, 68, 0.35), inset 0 1px 0 rgba(255,255,255,0.4);
+}
+/* 회색 — 로그아웃/취소 */
+.btn.ghost {
+  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  color: #333; text-shadow: none;
+  box-shadow: 0 6px 18px rgba(195, 207, 226, 0.4), inset 0 1px 0 rgba(255,255,255,0.8);
+  border: 1px solid rgba(0,0,0,0.05);
+}
+/* 노랑 — 매물 불러오기 */
+.btn.yellow {
+  background: linear-gradient(135deg, #ffd54f 0%, #ffab00 100%);
+  color: #4e3400; text-shadow: none;
+  box-shadow: 0 8px 24px rgba(255, 171, 0, 0.35), inset 0 1px 0 rgba(255,255,255,0.7);
+}
+/* 청록 — 보조 액션 */
+.btn.green {
+  background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+  color: #0b5a26; text-shadow: none;
+  box-shadow: 0 8px 24px rgba(67, 233, 123, 0.4), inset 0 1px 0 rgba(255,255,255,0.4);
+}
 
 /* PC 연결 상태 배지 */
 .pc-badge { display: inline-flex; align-items: center; gap: 6px;
@@ -181,13 +204,14 @@ progress::-webkit-progress-value { background: var(--primary); border-radius: 5p
 .retry-row span { white-space: nowrap; }
 input[type=range] { flex: 1; accent-color: var(--primary); }
 
-/* 진행/로그 통합 영역 — 매물 목록처럼 명확한 스크롤 */
-.log { max-height: 500px; min-height: 140px; overflow-y: auto;
+/* 진행/로그 통합 영역 — 매물 목록처럼 좌우/상하 스크롤 */
+.log { max-height: 420px; min-height: 140px; overflow: auto;
        -webkit-overflow-scrolling: touch;
-       font-size: 14px; line-height: 1.7;
-       background: rgba(0,0,0,0.04); padding: 14px 16px; border-radius: 12px;
-       white-space: pre-wrap; word-break: break-all; color: #222; }
-.log-line { padding: 4px 0; border-bottom: 1px solid rgba(0,0,0,0.05); }
+       font-size: 14px; line-height: 1.6;
+       background: rgba(0,0,0,0.04); padding: 10px 14px; border-radius: 12px;
+       color: #222; }
+.log-line { padding: 8px 0; border-bottom: 1px solid rgba(0,0,0,0.06);
+            white-space: nowrap; }  /* 한 줄로 — 가로 스크롤 */
 .log-line:last-child { border-bottom: none; }
 .log-line { padding: 2px 0; }
 .progress-mini { display: flex; align-items: center; gap: 10px; font-size: 14px;
@@ -247,7 +271,7 @@ input[type=range] { flex: 1; accent-color: var(--primary); }
   <!-- 매물 목록 (밝은 카드 — 등록 시작 버튼이 이 안에 들어옴) -->
   <div class="card bright">
     <div class="section-title">📋 매물 목록 — 체크하면 등록 대상</div>
-    <button class="btn fullwidth" id="btn-refresh" onclick="doRefresh()"
+    <button class="btn fullwidth yellow" id="btn-refresh" onclick="doRefresh()"
             style="margin-bottom:10px;">
       📋 PC 에서 매물 불러오기
     </button>
