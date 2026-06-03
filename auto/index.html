@@ -522,7 +522,10 @@ function updateStartStopBtn() {
     btn.classList.add('danger');
     btn.disabled = false;
   } else {
-    const sel = selectedSet.size;
+    // summary 와 동일하게 validNums 필터 — stale 선택 거름
+    const arr = Array.isArray(listingsCache) ? listingsCache : Object.values(listingsCache);
+    const validNums = new Set((arr || []).map(l => String(l.num)));
+    const sel = [...selectedSet].filter(n => validNums.has(n)).length;
     btn.textContent = `🚀 선택 매물 ${sel}개 등록 시작`;
     btn.classList.remove('danger');
     btn.disabled = sel === 0;
