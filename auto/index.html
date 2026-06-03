@@ -129,20 +129,22 @@ progress::-webkit-progress-value { background: var(--primary); border-radius: 5p
 
 /* 매물 목록 — 가독성 우선. 매물명 잘리면 전체를 좌우 스크롤로 같이 끌어서 끝까지 봄 */
 .listings { max-height: 420px; overflow: auto; padding: 4px 0;
-            -webkit-overflow-scrolling: touch; position: relative; }
-/* 매물 불러오는 중 시각 효과 */
-.listings.refreshing { pointer-events: none; min-height: 180px; }
-.listings.refreshing > * { opacity: 0.25; filter: blur(1.5px); transition: opacity 0.2s, filter 0.2s; }
-.listings.refreshing::before {
-  content: '🔄 매물 불러오는 중...\A(30~60초 소요)';
-  white-space: pre-line;
-  position: absolute; top: 50%; left: 50%;
-  transform: translate(-50%, -50%);
-  background: rgba(255,255,255,0.97);
-  padding: 16px 24px; border-radius: 16px;
-  font-size: 15px; font-weight: 700; color: #222;
-  box-shadow: 0 4px 18px rgba(0,0,0,0.18);
-  z-index: 10; text-align: center; line-height: 1.5;
+            -webkit-overflow-scrolling: touch; }
+/* 매물 불러오는 중 — 매물 목록 영역 통째로 spinner 박스로 교체 */
+.refresh-overlay {
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  min-height: 240px; padding: 30px 20px; gap: 14px;
+  background: rgba(255,255,255,0.65);
+  border-radius: 14px;
+  text-align: center;
+}
+.refresh-overlay .spin { font-size: 42px; animation: refresh-spin 1.6s linear infinite; }
+.refresh-overlay .msg { font-size: 17px; font-weight: 700; color: #222; }
+.refresh-overlay .sub { font-size: 14px; font-weight: 500; color: #666; }
+@keyframes refresh-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 .listings-inner { display: table; min-width: 100%; }
 .matter { display: flex; align-items: center; gap: 10px; padding: 12px 4px;
@@ -385,9 +387,11 @@ function attachListeners() {
   onValue(ref(db, `users/${userId}/auto/listings`), (snap) => {
     listingsCache = snap.val() || [];
     renderListings();
-    // 새 매물 들어오면 새로고침 효과 해제 (PC 가 push 한 즉시)
-    clearTimeout(refreshTimeout);
-    setRefreshingUI(false);
+    // 새로고침 진행 중이었을 때만 해제 (페이지 로드 시 자동 fire 와 구분)
+    if (isRefreshingUI) {
+      clearTimeout(refreshTimeout);
+      setRefreshingUI(false);
+    }
   });
   onValue(ref(db, `users/${userId}/auto/status`), (snap) => {
     renderStatus(snap.val() || {});
@@ -548,17 +552,26 @@ window.doStop = async function() {
 };
 
 let refreshTimeout = null;
+let isRefreshingUI = false;
 function setRefreshingUI(on) {
   const list = document.getElementById('listings');
   const btn = document.getElementById('btn-refresh');
   if (on) {
-    list.classList.add('refreshing');
+    isRefreshingUI = true;
+    // 매물 목록 영역 통째로 spinner 박스로 교체 — 확실한 시각 변화
+    list.innerHTML = `
+      <div class="refresh-overlay">
+        <div class="spin">🔄</div>
+        <div class="msg">PC 에서 매물 불러오는 중...</div>
+        <div class="sub">(30~60초 소요)</div>
+      </div>`;
     btn.disabled = true;
     btn.textContent = '🔄 매물 불러오는 중...';
   } else {
-    list.classList.remove('refreshing');
+    isRefreshingUI = false;
     btn.disabled = false;
     btn.textContent = '📋 PC 에서 매물 불러오기';
+    // listings 안 spinner 는 renderListings 가 새 매물로 알아서 교체
   }
 }
 
