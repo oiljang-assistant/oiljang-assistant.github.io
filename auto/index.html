@@ -129,7 +129,21 @@ progress::-webkit-progress-value { background: var(--primary); border-radius: 5p
 
 /* 매물 목록 — 가독성 우선. 매물명 잘리면 전체를 좌우 스크롤로 같이 끌어서 끝까지 봄 */
 .listings { max-height: 420px; overflow: auto; padding: 4px 0;
-            -webkit-overflow-scrolling: touch; }
+            -webkit-overflow-scrolling: touch; position: relative; }
+/* 매물 불러오는 중 시각 효과 */
+.listings.refreshing { pointer-events: none; min-height: 180px; }
+.listings.refreshing > * { opacity: 0.25; filter: blur(1.5px); transition: opacity 0.2s, filter 0.2s; }
+.listings.refreshing::before {
+  content: '🔄 매물 불러오는 중...\A(30~60초 소요)';
+  white-space: pre-line;
+  position: absolute; top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(255,255,255,0.97);
+  padding: 16px 24px; border-radius: 16px;
+  font-size: 15px; font-weight: 700; color: #222;
+  box-shadow: 0 4px 18px rgba(0,0,0,0.18);
+  z-index: 10; text-align: center; line-height: 1.5;
+}
 .listings-inner { display: table; min-width: 100%; }
 .matter { display: flex; align-items: center; gap: 10px; padding: 12px 4px;
           border-bottom: 1px solid rgba(0,0,0,0.08); font-size: 17px;
@@ -371,6 +385,9 @@ function attachListeners() {
   onValue(ref(db, `users/${userId}/auto/listings`), (snap) => {
     listingsCache = snap.val() || [];
     renderListings();
+    // 새 매물 들어오면 새로고침 효과 해제 (PC 가 push 한 즉시)
+    clearTimeout(refreshTimeout);
+    setRefreshingUI(false);
   });
   onValue(ref(db, `users/${userId}/auto/status`), (snap) => {
     renderStatus(snap.val() || {});
@@ -530,14 +547,37 @@ window.doStop = async function() {
   } catch (e) { showToast('실패: ' + e.message); }
 };
 
+let refreshTimeout = null;
+function setRefreshingUI(on) {
+  const list = document.getElementById('listings');
+  const btn = document.getElementById('btn-refresh');
+  if (on) {
+    list.classList.add('refreshing');
+    btn.disabled = true;
+    btn.textContent = '🔄 매물 불러오는 중...';
+  } else {
+    list.classList.remove('refreshing');
+    btn.disabled = false;
+    btn.textContent = '📋 PC 에서 매물 불러오기';
+  }
+}
+
 window.doRefresh = async function() {
   if (isBgRunning) { showToast('등록 진행 중 — 매물 불러오기 안 됨'); return; }
+  setRefreshingUI(true);
+  // 안전장치 — 90초 후 자동 해제 (PC 에서 실패해도 UI 풀리도록)
+  clearTimeout(refreshTimeout);
+  refreshTimeout = setTimeout(() => setRefreshingUI(false), 90000);
   try {
     await set(ref(db, `users/${userId}/auto/command`), {
       type: 'refresh', active: true, timestamp: { '.sv': 'timestamp' }
     });
     showToast('📋 PC 에 매물 불러오기 요청 (30~60초)');
-  } catch (e) { showToast('실패: ' + e.message); }
+  } catch (e) {
+    showToast('실패: ' + e.message);
+    clearTimeout(refreshTimeout);
+    setRefreshingUI(false);
+  }
 };
 
 function escapeHtml(s) {
