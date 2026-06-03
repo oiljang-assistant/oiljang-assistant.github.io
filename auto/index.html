@@ -409,13 +409,14 @@ function attachListeners() {
       }
     }
   });
-  // query/limitToLast 빼고 그냥 listen — 일부 폰에서 query 가 새 child 추가 시 fire 누락하는 케이스 회피
+  // listings 와 동일 패턴 — snap.val() 직접 + Array/Object 양쪽 처리 (snap.forEach 가 array 처리 다른 케이스 회피)
   onValue(ref(db, `users/${userId}/auto/log`), (snap) => {
-    const all = [];
-    snap.forEach(c => all.push(c.val()));
-    const items = all.slice(-100);  // 클라이언트에서 마지막 100개만
+    const val = snap.val();
+    const all = !val ? []
+              : Array.isArray(val) ? val
+              : Object.values(val);
+    const items = all.slice(-100);
     renderLog(items);
-    // 매물 불러오기 완료/실패 감지 → spinner 해제 (listings 가 동일 데이터일 때도 안전)
     if (isRefreshingUI && items.length > 0) {
       const last = (items[items.length - 1].message || '');
       if (last.includes('폰 동기화 완료') ||
