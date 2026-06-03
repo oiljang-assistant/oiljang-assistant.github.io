@@ -409,24 +409,8 @@ function attachListeners() {
       }
     }
   });
-  // listings 와 동일 패턴 — snap.val() 직접 + Array/Object 양쪽 처리 (snap.forEach 가 array 처리 다른 케이스 회피)
-  onValue(ref(db, `users/${userId}/auto/log`), (snap) => {
-    const val = snap.val();
-    const all = !val ? []
-              : Array.isArray(val) ? val
-              : Object.values(val);
-    const items = all.slice(-100);
-    renderLog(items);
-    if (isRefreshingUI && items.length > 0) {
-      const last = (items[items.length - 1].message || '');
-      if (last.includes('폰 동기화 완료') ||
-          last.includes('새로고침 실패') ||
-          last.includes('새로고침 예외')) {
-        clearTimeout(refreshTimeout);
-        setRefreshingUI(false);
-      }
-    }
-  });
+  // log 는 fetch polling 으로 — onValue 가 일부 fire 누락하는 케이스 회피 (메인 비서앱 패턴)
+  startLogPolling();
   onValue(ref(db, `users/${userId}/auto/selected`), (snap) => {
     const sel = snap.val() || [];
     selectedSet = new Set(sel.map(String));
@@ -543,6 +527,40 @@ window.onStartStopClick = function() {
   if (isBgRunning) doStop();
   else doStart();
 };
+
+// 메인 비서앱 패턴 — onValue 가 일부 fire 누락하는 케이스 회피 위해 3초 polling
+let _logPollTimer = null;
+async function pollLogs() {
+  if (!userId || !auth.currentUser) return;
+  try {
+    const idToken = await auth.currentUser.getIdToken();
+    const url = `https://oiljang-firebase-default-rtdb.asia-southeast1.firebasedatabase.app/users/${userId}/auto/log.json?auth=${idToken}`;
+    const r = await fetch(url);
+    if (!r.ok) return;
+    const data = await r.json();
+    let items = [];
+    if (data) {
+      items = Array.isArray(data) ? data : Object.values(data);
+      items.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+      items = items.slice(-100);
+    }
+    renderLog(items);
+    if (isRefreshingUI && items.length > 0) {
+      const last = (items[items.length - 1].message || '');
+      if (last.includes('폰 동기화 완료') ||
+          last.includes('새로고침 실패') ||
+          last.includes('새로고침 예외')) {
+        clearTimeout(refreshTimeout);
+        setRefreshingUI(false);
+      }
+    }
+  } catch (e) {}
+}
+function startLogPolling() {
+  if (_logPollTimer) clearInterval(_logPollTimer);
+  pollLogs();  // 즉시 1회
+  _logPollTimer = setInterval(pollLogs, 3000);  // 3초마다
+}
 
 function renderLog(items) {
   const root = document.getElementById('log');
