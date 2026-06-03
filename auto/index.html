@@ -400,6 +400,16 @@ function attachListeners() {
     const items = [];
     snap.forEach(c => items.push(c.val()));
     renderLog(items);
+    // 매물 불러오기 완료/실패 감지 → spinner 해제 (listings 가 동일 데이터일 때도 안전)
+    if (isRefreshingUI && items.length > 0) {
+      const last = (items[items.length - 1].message || '');
+      if (last.includes('폰 동기화 완료') ||
+          last.includes('새로고침 실패') ||
+          last.includes('새로고침 예외')) {
+        clearTimeout(refreshTimeout);
+        setRefreshingUI(false);
+      }
+    }
   });
   onValue(ref(db, `users/${userId}/auto/selected`), (snap) => {
     const sel = snap.val() || [];
