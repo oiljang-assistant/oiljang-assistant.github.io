@@ -583,6 +583,10 @@ function setRefreshingUI(on) {
         <div class="spin">🔄</div>
         <div class="msg">PC 에서 매물 불러오는 중...</div>
         <div class="sub">(30~60초 소요)</div>
+        <button type="button" class="btn" onclick="cancelRefresh()"
+                style="margin-top:10px; padding:8px 20px; font-size:13px;">
+          ✕ 취소
+        </button>
       </div>`;
     btn.disabled = true;
     btn.textContent = '🔄 매물 불러오는 중...';
@@ -593,6 +597,15 @@ function setRefreshingUI(on) {
     // listings 안 spinner 는 renderListings 가 새 매물로 알아서 교체
   }
 }
+
+window.cancelRefresh = function() {
+  // 폰 측에서 spinner 만 해제 — PC 작업은 계속 진행 (백그라운드)
+  // 매물 목록 표시 복원 위해 renderListings 호출
+  clearTimeout(refreshTimeout);
+  setRefreshingUI(false);
+  renderListings();  // 옛 매물 다시 표시 (PC 가 push 끝나면 자동 갱신)
+  showToast('취소됨 (PC 작업은 계속 진행 중)');
+};
 
 window.doRefresh = async function() {
   if (isBgRunning) { showToast('등록 진행 중 — 매물 불러오기 안 됨'); return; }
