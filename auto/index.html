@@ -165,10 +165,15 @@ progress::-webkit-progress-value { background: var(--primary); border-radius: 5p
 .retry-row span { white-space: nowrap; }
 input[type=range] { flex: 1; accent-color: var(--primary); }
 
-/* 로그 */
-.log { max-height: 200px; overflow-y: auto; font-size: 12px; line-height: 1.7;
-       background: rgba(0,0,0,0.04); padding: 10px 12px; border-radius: 12px;
+/* 진행/로그 통합 영역 */
+.log { max-height: 360px; overflow-y: auto; font-size: 13px; line-height: 1.8;
+       background: rgba(0,0,0,0.04); padding: 12px 14px; border-radius: 12px;
        white-space: pre-wrap; word-break: break-all; color: #222; }
+.log-line { padding: 2px 0; }
+.progress-mini { display: flex; align-items: center; gap: 10px; font-size: 14px;
+                 color: #222; font-weight: 700; margin-bottom: 10px; }
+.progress-mini progress { flex: 1; height: 8px; border-radius: 4px; }
+#log-progress-row.hidden { display: none; }
 
 /* 토스트 */
 .toast { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
@@ -219,22 +224,7 @@ input[type=range] { flex: 1; accent-color: var(--primary); }
     </div>
   </div>
 
-  <!-- 진행상황 -->
-  <div class="card" id="status-card">
-    <div class="section-title">📡 진행상황</div>
-    <div class="status-msg" id="status-msg">대기 중</div>
-    <div class="status-current" id="status-current"></div>
-    <div class="progress-row">
-      <progress id="status-progress" value="0" max="100"></progress>
-      <span id="status-counter">0/0</span>
-    </div>
-    <div style="margin-top: 12px;">
-      <button class="btn danger fullwidth" id="btn-stop"
-              onclick="doStop()" style="display:none;">🛑 안전 중지</button>
-    </div>
-  </div>
-
-  <!-- 매물 목록 (밝은 카드 — 가독성 우선) -->
+  <!-- 매물 목록 (밝은 카드 — 등록 시작 버튼이 이 안에 들어옴) -->
   <div class="card bright">
     <div class="section-title">📋 매물 목록 — 체크하면 등록 대상</div>
     <button class="btn fullwidth" id="btn-refresh" onclick="doRefresh()"
@@ -247,9 +237,25 @@ input[type=range] { flex: 1; accent-color: var(--primary); }
       </p>
     </div>
     <div class="summary" id="summary">체크: <b>0개</b> / 전체 0개</div>
+    <!-- 등록 시작 / 중지 토글 (등록 중엔 중지 라벨로) -->
+    <button class="btn fullwidth" id="btn-start-stop" onclick="onStartStopClick()"
+            style="margin-top:8px;">
+      🚀 선택 매물 등록 시작
+    </button>
   </div>
 
-  <!-- 옵션 + 시작 -->
+  <!-- 진행 + 로그 통합 -->
+  <div class="card">
+    <div class="section-title">📜 진행 / 로그</div>
+    <div id="status-mini" class="progress-mini" style="display:none;">
+      <span id="status-mini-msg">대기 중</span>
+      <progress id="status-mini-progress" value="0" max="100"></progress>
+      <span id="status-mini-counter">0/0</span>
+    </div>
+    <div id="log" class="log">대기 중...</div>
+  </div>
+
+  <!-- 옵션 -->
   <div class="card">
     <div class="section-title">⚙️ 옵션</div>
     <div class="options-row">
@@ -263,15 +269,6 @@ input[type=range] { flex: 1; accent-color: var(--primary); }
       <input type="range" id="opt-retry" min="0" max="2" value="1"
              oninput="document.getElementById('retry-label').textContent=this.value">
     </div>
-    <button class="btn fullwidth" id="btn-start" onclick="doStart()" style="margin-top:8px;">
-      🚀 선택 매물 등록 시작
-    </button>
-  </div>
-
-  <!-- 로그 -->
-  <div class="card">
-    <div class="section-title">📜 로그</div>
-    <div id="log" class="log">대기 중...</div>
   </div>
 
   <div class="footer-bar">
@@ -434,9 +431,8 @@ function updateSummary() {
   const valid = [...selectedSet].filter(n => validNums.has(n));
   const selCount = valid.length;
   document.getElementById('summary').innerHTML = `체크: <b>${selCount}개</b> / 전체 ${total}개`;
-  const startBtn = document.getElementById('btn-start');
-  startBtn.textContent = `🚀 선택 매물 ${selCount}개 등록 시작`;
-  startBtn.disabled = isBgRunning || selCount === 0;
+  // 통합 등록/중지 토글 버튼 라벨 갱신
+  updateStartStopBtn();
 }
 
 window.toggleSelect = async function(num, checked) {
@@ -456,23 +452,47 @@ function renderStatus(status) {
   const wasRunning = isBgRunning;
   isBgRunning = total > 0 && done < total && !(msg.includes('완료'));
 
-  const card = document.getElementById('status-card');
-  if (msg || total > 0) card.classList.add('active');
-  else card.classList.remove('active');
+  // status-mini 갱신 (진행 중이거나 완료 메시지 있을 때만 표시)
+  const mini = document.getElementById('status-mini');
+  if (msg || total > 0) {
+    mini.style.display = 'flex';
+    document.getElementById('status-mini-msg').textContent = msg || '대기 중';
+    const pct = total > 0 ? Math.min(100, Math.round(done / total * 100)) : 0;
+    document.getElementById('status-mini-progress').value = pct;
+    document.getElementById('status-mini-progress').max = 100;
+    document.getElementById('status-mini-counter').textContent = `${done}/${total}`;
+  } else {
+    mini.style.display = 'none';
+  }
 
-  document.getElementById('status-msg').textContent = msg || '대기 중';
-  document.getElementById('status-current').textContent = status.current || '';
-  const pct = total > 0 ? Math.min(100, Math.round(done / total * 100)) : 0;
-  document.getElementById('status-progress').value = pct;
-  document.getElementById('status-progress').max = 100;
-  document.getElementById('status-counter').textContent = `${done}/${total}`;
+  // 등록/중지 토글 버튼 라벨 갱신
+  updateStartStopBtn();
 
-  document.getElementById('btn-stop').style.display = isBgRunning ? 'block' : 'none';
   if (wasRunning !== isBgRunning) {
     renderListings();
     updateSummary();
   }
 }
+
+function updateStartStopBtn() {
+  const btn = document.getElementById('btn-start-stop');
+  if (!btn) return;
+  if (isBgRunning) {
+    btn.textContent = '🛑 다음 매물부터 중지';
+    btn.classList.add('danger');
+    btn.disabled = false;
+  } else {
+    const sel = selectedSet.size;
+    btn.textContent = `🚀 선택 매물 ${sel}개 등록 시작`;
+    btn.classList.remove('danger');
+    btn.disabled = sel === 0;
+  }
+}
+
+window.onStartStopClick = function() {
+  if (isBgRunning) doStop();
+  else doStart();
+};
 
 function renderLog(items) {
   const root = document.getElementById('log');
@@ -480,7 +500,10 @@ function renderLog(items) {
     root.textContent = '대기 중...';
     return;
   }
-  root.innerHTML = items.map(i => escapeHtml(i.message || '')).join('\n');
+  // 각 메시지를 별도 div 로 — 한 줄로 합쳐지지 않도록
+  root.innerHTML = items.map(i =>
+    `<div class="log-line">${escapeHtml(i.message || '')}</div>`
+  ).join('');
   root.scrollTop = root.scrollHeight;
 }
 
