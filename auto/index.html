@@ -409,9 +409,11 @@ function attachListeners() {
       }
     }
   });
-  onValue(query(ref(db, `users/${userId}/auto/log`), limitToLast(100)), (snap) => {
-    const items = [];
-    snap.forEach(c => items.push(c.val()));
+  // query/limitToLast 빼고 그냥 listen — 일부 폰에서 query 가 새 child 추가 시 fire 누락하는 케이스 회피
+  onValue(ref(db, `users/${userId}/auto/log`), (snap) => {
+    const all = [];
+    snap.forEach(c => all.push(c.val()));
+    const items = all.slice(-100);  // 클라이언트에서 마지막 100개만
     renderLog(items);
     // 매물 불러오기 완료/실패 감지 → spinner 해제 (listings 가 동일 데이터일 때도 안전)
     if (isRefreshingUI && items.length > 0) {
