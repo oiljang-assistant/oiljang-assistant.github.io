@@ -310,8 +310,8 @@ input[type=range] { flex: 1; accent-color: var(--primary); }
       </label>
     </div>
     <div class="retry-row">
-      <span>실패 시 재시도: <b id="retry-label">1</b>회</span>
-      <input type="range" id="opt-retry" min="0" max="2" value="1"
+      <span>실패 시 재시도: <b id="retry-label">2</b>회</span>
+      <input type="range" id="opt-retry" min="0" max="2" value="2"
              oninput="document.getElementById('retry-label').textContent=this.value">
     </div>
   </div>
@@ -467,7 +467,7 @@ function renderListings() {
     const checked = selectedSet.has(num) ? 'checked' : '';
     return `
       <div class="matter">
-        <span class="idx">${i + 1}</span>
+        <span class="idx">${arr.length - i}</span>
         <input type="checkbox" data-num="${num}" ${checked} ${isBgRunning ? 'disabled' : ''}
                onchange="toggleSelect('${num}', this.checked)">
         <span class="name">${escapeHtml(l.name || '(이름 없음)')}</span>
@@ -600,9 +600,22 @@ function renderLog(items) {
   root.scrollTop = root.scrollHeight;
 }
 
-window.doStart = async function() {
+// 명령 종류별 in-flight lock — 한 클릭에 onClick 이 두 번 fire 되어도 한 번만 실제 set
+const _inFlight = { start: false, stop: false, refresh: false };
+function _withLock(name, fn) {
+  if (_inFlight[name]) { showToast('이미 처리 중...'); return; }
+  _inFlight[name] = true;
+  fn().finally(() => {
+    setTimeout(() => { _inFlight[name] = false; }, 3000);  // 3초 후 다음 진짜 클릭 허용
+  });
+}
+
+window.doStart = function() { _withLock('start', async () => {
   if (selectedSet.size === 0) { showToast('매물을 먼저 체크해주세요'); return; }
   if (isBgRunning) { showToast('이미 진행 중이에요'); return; }
+  // 즉시 진행 중으로 표시 — PC 응답 안 기다리고 lock
+  isBgRunning = true;
+  updateStartStopBtn();
   const retry = parseInt(document.getElementById('opt-retry').value);
   const deleteOld = document.getElementById('opt-delete-old').checked;
   try {
@@ -611,17 +624,21 @@ window.doStart = async function() {
       timestamp: { '.sv': 'timestamp' }
     });
     showToast(`🚀 PC 에 시작 명령 — ${selectedSet.size}개 매물`);
-  } catch (e) { showToast('전송 실패: ' + e.message); }
-};
+  } catch (e) {
+    showToast('전송 실패: ' + e.message);
+    isBgRunning = false;
+    updateStartStopBtn();
+  }
+});};
 
-window.doStop = async function() {
+window.doStop = function() { _withLock('stop', async () => {
   try {
     await set(ref(db, `users/${userId}/auto/command`), {
       type: 'stop', active: true, timestamp: { '.sv': 'timestamp' }
     });
     showToast('🛑 중지 명령 전송');
   } catch (e) { showToast('실패: ' + e.message); }
-};
+});};
 
 let refreshTimeout = null;
 let isRefreshingUI = false;
@@ -664,8 +681,9 @@ window.cancelRefresh = function() {
   showToast('취소됨 (PC 작업은 계속 진행 중)');
 };
 
-window.doRefresh = async function() {
+window.doRefresh = function() { _withLock('refresh', async () => {
   if (isBgRunning) { showToast('등록 진행 중 — 매물 불러오기 안 됨'); return; }
+  if (isRefreshingUI) { showToast('이미 불러오는 중'); return; }
   setRefreshingUI(true);
   // 안전장치 — 90초 후 자동 해제 (PC 에서 실패해도 UI 풀리도록)
   clearTimeout(refreshTimeout);
@@ -680,7 +698,7 @@ window.doRefresh = async function() {
     clearTimeout(refreshTimeout);
     setRefreshingUI(false);
   }
-};
+});};
 
 function escapeHtml(s) {
   return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
