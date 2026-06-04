@@ -462,12 +462,24 @@ function renderListings() {
     updateSummary();
     return;
   }
+  // 진행중 / 보류 각자 별도로 거꾸로 번호 (오일장 사이트 각 탭 번호와 일치)
+  const activeTotal = arr.filter(l => l.status !== '보류').length;
+  const heldTotal = arr.filter(l => l.status === '보류').length;
+  let activeSeen = 0, heldSeen = 0;
   const inner = arr.map((l, i) => {
     const num = String(l.num);
     const checked = selectedSet.has(num) ? 'checked' : '';
+    let idxNum;
+    if (l.status === '보류') {
+      heldSeen++;
+      idxNum = heldTotal - heldSeen + 1;
+    } else {
+      activeSeen++;
+      idxNum = activeTotal - activeSeen + 1;
+    }
     return `
       <div class="matter">
-        <span class="idx">${arr.length - i}</span>
+        <span class="idx">${idxNum}</span>
         <input type="checkbox" data-num="${num}" ${checked} ${isBgRunning ? 'disabled' : ''}
                onchange="toggleSelect('${num}', this.checked)">
         <span class="name">${escapeHtml(l.name || '(이름 없음)')}</span>
