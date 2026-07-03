@@ -518,7 +518,11 @@ function renderStatus(status) {
   const done = parseInt(status.done || 0);
 
   const wasRunning = isBgRunning;
-  isBgRunning = total > 0 && done < total && !(msg.includes('완료'));
+  // 안전망: PC 가 예외로 죽어 "처리 중" status 가 박제되면 폰이 영영 잠기는 것 방어.
+  // 정상 등록은 매물마다(약 2분) status 가 갱신되므로, 10분 넘게 안 바뀌면 진행중으로 보지 않음.
+  const stAge = (typeof status.timestamp === 'number') ? (Date.now() - status.timestamp) : Infinity;
+  const stale = stAge > 10 * 60 * 1000;
+  isBgRunning = !stale && total > 0 && done < total && !(msg.includes('완료'));
 
   // status-mini 갱신 (진행 중이거나 완료 메시지 있을 때만 표시)
   const mini = document.getElementById('status-mini');
