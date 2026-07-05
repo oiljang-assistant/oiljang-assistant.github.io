@@ -289,18 +289,6 @@ input[type=range] { flex: 1; accent-color: var(--primary); }
     </button>
   </div>
 
-  <!-- 프리미엄 자동갱신 -->
-  <div class="card">
-    <div class="section-title">⚡ 프리미엄 자동갱신</div>
-    <p style="font-size:13px; color:#666; margin:0 0 10px;">PC 를 켜두면 운영시간 내 프리미엄 매물을 자동으로 수정 갱신합니다.</p>
-    <button class="btn fullwidth green" id="btn-refresh-on" onclick="doRefreshStart()" style="margin-bottom:8px;">
-      🔄 자동갱신 켜기 (ON)
-    </button>
-    <button class="btn fullwidth danger" id="btn-refresh-off" onclick="doRefreshStop()">
-      ⏹ 자동갱신 끄기 (OFF)
-    </button>
-  </div>
-
   <!-- 진행 + 로그 통합 -->
   <div class="card">
     <div class="section-title">📜 진행 / 로그</div>
@@ -326,6 +314,18 @@ input[type=range] { flex: 1; accent-color: var(--primary); }
       <input type="range" id="opt-retry" min="0" max="2" value="2"
              oninput="document.getElementById('retry-label').textContent=this.value">
     </div>
+  </div>
+
+  <!-- 프리미엄 자동갱신 -->
+  <div class="card">
+    <div class="section-title">⚡ 프리미엄 자동갱신</div>
+    <p style="font-size:13px; color:#666; margin:0 0 10px;">PC 를 켜두면 운영시간 내 프리미엄 매물을 자동으로 수정 갱신합니다.</p>
+    <button class="btn fullwidth green" id="btn-refresh-on" onclick="doRefreshStart()" style="margin-bottom:8px;">
+      🔄 자동갱신 켜기 (ON)
+    </button>
+    <button class="btn fullwidth danger" id="btn-refresh-off" onclick="doRefreshStop()">
+      ⏹ 자동갱신 끄기 (OFF)
+    </button>
   </div>
 
   <div class="footer-bar">
