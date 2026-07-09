@@ -364,12 +364,14 @@ function updatePcSignal() {
 setInterval(updatePcSignal, 5000);
 
 // 익명 로그인
+// 핵심: 인증이 실패/지연돼도 __authReady 는 반드시 풀린다 → 로그인은 PC연결/인증과 무관하게 항상 진행됨
+// (인증 막히면 연결만 '안됨'으로 뜨고, 화면 진입은 됨. 예전엔 여기서 영원히 대기해 로그인 자체가 먹통이었음)
 window.__authReady = new Promise((resolve) => {
   let resolved = false;
-  onAuthStateChanged(auth, async (user) => {
-    if (user) { if (!resolved) { resolved = true; resolve(); } }
-    else { try { await signInAnonymously(auth); } catch (e) {} }
-  });
+  const fin = () => { if (!resolved) { resolved = true; resolve(); } };
+  onAuthStateChanged(auth, (user) => { if (user) fin(); });
+  signInAnonymously(auth).catch(() => fin());  // 인증 실패해도 진행
+  setTimeout(fin, 5000);                        // 5초 내 인증 안 되면 그냥 로그인 진행
 });
 
 window.addEventListener('DOMContentLoaded', async () => {
