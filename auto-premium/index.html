@@ -615,17 +615,27 @@ function startLogPolling() {
   _logPollTimer = setInterval(pollLogs, 3000);  // 3초마다
 }
 
+let _lastLogRender = '';
 function renderLog(items) {
   const root = document.getElementById('log');
   if (!items || items.length === 0) {
     root.textContent = '대기 중...';
+    _lastLogRender = '';
     return;
   }
   // 각 메시지를 별도 div 로 — 한 줄로 합쳐지지 않도록
-  root.innerHTML = items.map(i =>
+  const html = items.map(i =>
     `<div class="log-line">${escapeHtml(i.message || '')}</div>`
   ).join('');
-  root.scrollTop = root.scrollHeight;
+  // 내용 변화 없으면 리렌더·스크롤 안 함 (완료 후 위로 올려봐도 안 끌려감)
+  if (html === _lastLogRender) return;
+  // 리렌더 전에 사용자가 맨 아래 근처였는지 기억
+  const prevTop = root.scrollTop;
+  const atBottom = root.scrollHeight - prevTop - root.clientHeight < 40;
+  root.innerHTML = html;
+  _lastLogRender = html;
+  if (atBottom) root.scrollTop = root.scrollHeight;  // 맨 아래 보던 중이면 새 로그 따라 내려감
+  else root.scrollTop = prevTop;                      // 위로 올려 읽던 중이면 위치 유지
 }
 
 // 명령 종류별 in-flight lock — 한 클릭에 onClick 이 두 번 fire 되어도 한 번만 실제 set
