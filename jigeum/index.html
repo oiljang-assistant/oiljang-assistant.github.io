@@ -89,7 +89,7 @@
   .cell.sel{outline:2px solid var(--now); outline-offset:1px}
   .cell .dots{display:flex; gap:3px; margin-top:3px}
   .cell .d{width:5px; height:5px; border-radius:50%; background:var(--now)}
-  .cell .d.late{background:var(--late)} .cell .d.asap{background:var(--asap)}
+  .cell .d.late{background:var(--late)} .cell .d.asap{background:var(--asap)} .cell .d.done{background:var(--done)}
   .cell.today .d{background:#fff}
   .cal-day{margin-top:18px}
   .cal-day h3{font-size:14px; font-weight:800; margin:0 4px 8px}
@@ -246,29 +246,36 @@ function taskLi(t){
     <button class="del" data-del="${t.id}" aria-label="삭제">×</button></li>`;
 }
 
+function logRow(t){const d2=new Date(t.completedAt); const tm=`${d2.getHours()>=12?'오후':'오전'} ${((d2.getHours()+11)%12)+1}:${String(d2.getMinutes()).padStart(2,'0')}`; return `<div class="log-item"><span class="time">${tm}</span><span class="txt">${esc(t.text)}</span></div>`;}
 function viewCal(){
   const first=new Date(calY,calM,1), startDow=first.getDay(), dim=new Date(calY,calM+1,0).getDate();
-  const byDay={};
-  tasks.filter(t=>t.due&&!t.done).forEach(t=>{const k=dayKey(t.due); (byDay[k]=byDay[k]||[]).push(t);});
+  const dueBy={}, doneBy={};
+  tasks.filter(t=>t.due&&!t.done).forEach(t=>{const k=dayKey(t.due); (dueBy[k]=dueBy[k]||[]).push(t);});
+  tasks.filter(t=>t.done&&t.completedAt).forEach(t=>{const k=dayKey(t.completedAt); (doneBy[k]=doneBy[k]||[]).push(t);});
   const now=new Date();
   let html=`<div class="cal-head"><button data-cal="-1">‹</button><span>${calY}년 ${calM+1}월</span><button data-cal="1">›</button></div><div class="cal-grid">`;
   ['일','월','화','수','목','금','토'].forEach((w,i)=>html+=`<div class="wd ${i===0?'sun':''}">${w}</div>`);
   for(let i=0;i<startDow;i++)html+='<div class="cell pad"></div>';
   for(let d=1;d<=dim;d++){
-    const k=calY+'-'+calM+'-'+d, items=byDay[k]||[];
+    const k=calY+'-'+calM+'-'+d, due=dueBy[k]||[], done=doneBy[k]||[];
+    const has=due.length||done.length;
     const isToday=now.getFullYear()===calY&&now.getMonth()===calM&&now.getDate()===d;
     const sel=calSel===k;
-    let dots=''; if(items.length){const late=items.some(t=>t.due<Date.now()), asap=items.some(t=>t.urgent); dots=`<div class="dots"><span class="d ${late?'late':asap?'asap':''}"></span>${items.length>1?'<span class="d"></span>':''}${items.length>2?'<span class="d"></span>':''}</div>`;}
-    html+=`<div class="cell ${items.length?'has':''} ${isToday?'today':''} ${sel?'sel':''}" data-day="${k}">${d}${dots}</div>`;
+    let dots='';
+    if(has){const late=due.some(t=>t.due<Date.now()), asap=due.some(t=>t.urgent); dots='<div class="dots">';
+      if(due.length)dots+=`<span class="d ${late?'late':asap?'asap':''}"></span>`;
+      if(done.length)dots+='<span class="d done"></span>'; dots+='</div>';}
+    html+=`<div class="cell ${has?'has':''} ${isToday?'today':''} ${sel?'sel':''}" data-day="${k}">${d}${dots}</div>`;
   }
   html+='</div>';
-  if(calSel&&byDay[calSel]){
+  if(calSel){
     const [yy,mm,dd]=calSel.split('-').map(Number);
-    html+=`<div class="cal-day"><h3>${mm+1}월 ${dd}일</h3><ul>`;
-    byDay[calSel].sort((a,b)=>a.due-b.due).forEach(t=>html+=taskLi(t));
-    html+='</ul></div>';
-  } else if(calSel){
-    html+=`<div class="cal-day"><h3>${calSel.split('-')[2]}일 · 할 일 없음</h3></div>`;
+    const due=dueBy[calSel]||[], done=doneBy[calSel]||[];
+    html+=`<div class="cal-day"><h3>${mm+1}월 ${dd}일</h3>`;
+    if(due.length){html+='<ul>'; due.sort((a,b)=>a.due-b.due).forEach(t=>html+=taskLi(t)); html+='</ul>';}
+    if(done.length){html+=`<div class="sec someday" style="margin-top:14px"><span class="dot" style="background:var(--done)"></span><h2>한 일</h2><span class="count">${done.length}</span></div>`; done.sort((a,b)=>b.completedAt-a.completedAt).forEach(t=>html+=logRow(t));}
+    if(!due.length&&!done.length)html+='<p style="color:var(--muted);font-weight:600;margin:6px 4px">이 날은 기록이 없어요.</p>';
+    html+='</div>';
   }
   return html;
 }
