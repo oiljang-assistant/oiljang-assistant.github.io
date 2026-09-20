@@ -84,6 +84,14 @@
   .srch-hit .w{font-size:11.5px; font-weight:700; color:var(--muted); margin-bottom:2px}
   .srch-hit .x{font-size:15px; font-weight:600; word-break:keep-all}
   .srch-hit .nt{font-size:12.5px; color:var(--muted); margin-top:3px; font-weight:600}
+  .set-row{display:flex; align-items:center; gap:10px; padding:13px 0; border-bottom:1px solid var(--line)}
+  .set-row:last-child{border-bottom:0}
+  .set-row .lab{flex:1; min-width:0}
+  .set-row .lab b{display:block; font-size:14.5px; font-weight:700}
+  .set-row .lab span{font-size:12px; color:var(--muted); font-weight:600}
+  .set-row button{border:1.5px solid var(--line); background:transparent; color:inherit; font-family:inherit; font-size:13px; font-weight:800; padding:9px 14px; border-radius:10px; cursor:pointer; white-space:nowrap}
+  .set-row button.on{background:var(--now); border-color:var(--now); color:#fff}
+  .bk-warn{display:block; width:100%; text-align:left; margin-top:20px; border:1px solid var(--asap); background:var(--asap-soft); color:var(--asap); font-family:inherit; font-size:12.5px; font-weight:700; padding:11px 14px; border-radius:12px; cursor:pointer}
   .later-row{display:flex; gap:8px; margin-top:26px; flex-wrap:wrap}
   .later{border:1px dashed var(--line); background:transparent; color:var(--muted); font-family:inherit; font-size:12.5px; font-weight:700; padding:8px 14px; border-radius:999px; cursor:pointer}
   .later.on{border-style:solid; border-color:var(--now); color:var(--now)}
@@ -182,7 +190,7 @@
 </style>
 </head>
 <body>
-  <div class="greet"><h1 id="greetTitle">좋은 아침</h1><div class="sub" id="greetSub"></div><button class="srch-btn" id="searchBtn" aria-label="검색">🔍</button></div>
+  <div class="greet"><h1 id="greetTitle">좋은 아침</h1><div class="sub" id="greetSub"></div><button class="srch-btn" id="searchBtn" aria-label="검색">🔍</button><button class="srch-btn" id="setBtn" aria-label="설정">⚙️</button></div>
   <div class="tabs">
     <button data-view="now" class="active">지금</button>
     <button data-view="cal">달력</button>
@@ -200,7 +208,7 @@
       <button class="add" id="add" aria-label="추가">＋</button>
     </div>
     <div class="hint" id="hint">🎙️ 말하거나 적고 ＋. 날짜·"빨리"·"급함"은 자동 인식해요.</div>
-    <div class="ver"><button id="autoMic" class="vbtn"></button> · <span id="ver"></span></div>
+    <div class="ver"><span id="ver"></span></div>
   </div></div>
 
 <script>
@@ -340,6 +348,10 @@ function viewNow(all){
     html+='</div>';
     if(showSomeday&&someday.length){html+='<ul style="margin-top:10px">'; for(const t of someday)html+=taskLi(t); html+='</ul>';}
   }
+  const age=backupAgeDays();
+  if(tasks.length>=8 && (age===null||age>=14)){
+    html+=`<button class="bk-warn" data-goset="1">💾 ${age===null?'기록이 쌓였는데 백업을 한 번도 안 했어요.':`백업한 지 ${age}일 됐어요.`} 눌러서 파일로 빼두세요.</button>`;
+  }
   return html;
 }
 function taskLi(t){
@@ -439,6 +451,7 @@ document.body.addEventListener('click',e=>{
   const goto=e.target.closest('[data-goto]'), sd=e.target.closest('[data-someday]');
   if(goto){view=goto.dataset.goto; calSel=null; render(); window.scrollTo(0,0); return;}
   if(sd){showSomeday=!showSomeday; render(); return;}
+  if(e.target.closest('[data-goset]')){openSet(); return;}
 });
 
 /* ---- 음성 ---- */
@@ -456,7 +469,6 @@ else{let rec,listening=false;
   };
 }
 
-if(!localStorage.getItem(KEY+'.seen')){localStorage.setItem(KEY+'.seen','1'); if(tasks.length===0){add('이 앱 폰 크롬에서 열어 🎙️ 눌러보기'); addMode='todo'; add('세금계산서 발행 빨리'); add('내일 오후 3시 병원 예약');}}
 
 /* ---------- 항목 편집창 ---------- */
 let editId=null, memoRec=null;
@@ -528,6 +540,74 @@ document.body.addEventListener('click',e=>{
     memoRec.onend=()=>{btn.classList.remove('on'); memoRec=null;};
     memoRec.onerror=()=>{btn.classList.remove('on'); memoRec=null;};
     memoRec.start(); return;}
+});
+
+/* ---------- 백업 ----------
+   기록은 이 폰 크롬 안에만 있다. 크롬의 "쿠키 및 사이트 데이터"를 지우면 같이 날아간다.
+   (앱으로 설치해도 저장소는 크롬과 공유하므로 마찬가지) 그래서 파일로 빼두는 길을 만든다. */
+const BKKEY=KEY+'.lastbackup';
+function lastBackup(){const v=+localStorage.getItem(BKKEY); return v||0;}
+function backupAgeDays(){const v=lastBackup(); return v?Math.floor((Date.now()-v)/86400000):null;}
+function exportBackup(){
+  const data={app:'jigeum', ver:1, exportedAt:new Date().toISOString(), tasks};
+  const blob=new Blob([JSON.stringify(data)],{type:'application/json'});
+  const url=URL.createObjectURL(blob), a=document.createElement('a'), d=new Date();
+  a.href=url; a.download=`지금-백업-${d.getFullYear()}${pad2(d.getMonth()+1)}${pad2(d.getDate())}.json`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),2000);
+  localStorage.setItem(BKKEY,String(Date.now()));
+  setMsg(`${tasks.length}개를 파일로 내보냈어요. 드라이브나 카톡에 옮겨두세요.`);
+  render();
+}
+function importBackup(file){
+  const r=new FileReader();
+  r.onload=()=>{
+    let arr=null;
+    try{const d=JSON.parse(r.result); arr=Array.isArray(d)?d:d.tasks;}catch(e){}
+    if(!Array.isArray(arr)){setMsg('이 파일은 지금 앱 백업이 아니에요.'); return;}
+    // 합치기만 한다 — 같은 id는 건드리지 않아서 기존 기록이 지워질 일이 없다
+    const have=new Set(tasks.map(t=>t.id)); let added=0;
+    arr.forEach(t=>{
+      if(!t||!t.id||typeof t.text!=='string'||have.has(t.id))return;
+      tasks.push({id:t.id,text:t.text,due:t.due||null,urgent:!!t.urgent,asap:!!t.asap,
+                  done:!!t.done,completedAt:t.completedAt||null,note:t.note||null,created:t.created||Date.now()});
+      have.add(t.id); added++;
+    });
+    save(); render();
+    setMsg(added?`${added}개를 되살렸어요.`:'이미 다 있는 기록이었어요.');
+  };
+  r.onerror=()=>setMsg('파일을 읽지 못했어요.');
+  r.readAsText(file);
+}
+function setMsg(t){const h=document.getElementById('hint'); if(h)h.textContent=t;}
+
+/* ---------- 설정 ---------- */
+function openSet(){
+  const age=backupAgeDays();
+  const bk = age===null ? '아직 한 번도 안 했어요' : age===0 ? '오늘 했어요' : `${age}일 전`;
+  const wrap=document.createElement('div'); wrap.className='sheet-bg'; wrap.id='setBg';
+  wrap.innerHTML=`<div class="sheet" role="dialog" aria-label="설정">
+    <div class="sheet-top"><h3>설정</h3><button class="x" data-xclose="1" aria-label="닫기">✕</button></div>
+    <div class="set-row"><div class="lab"><b>열면 바로 듣기</b><span>앱을 열자마자 마이크가 켜져요</span></div>
+      <button data-automic="1" class="${autoMic?'on':''}">${autoMic?'켜짐':'꺼짐'}</button></div>
+    <div class="set-row"><div class="lab"><b>백업 내보내기</b><span>마지막 백업: ${bk} · 기록 ${tasks.length}개</span></div>
+      <button data-bkout="1">내보내기</button></div>
+    <div class="set-row"><div class="lab"><b>백업 가져오기</b><span>없는 기록만 더해요. 지워지지 않아요</span></div>
+      <button data-bkin="1">가져오기</button></div>
+    <input type="file" id="bkFile" accept="application/json,.json" style="display:none">
+    <p class="none" style="font-size:12px;margin-top:16px">기록은 이 폰 안에만 있어요. 크롬에서 "쿠키 및 사이트 데이터"를 지우면 같이 사라집니다. 지우기 전에 내보내기 한 번 눌러주세요.</p>
+    <p class="none" style="font-size:11px;margin-top:8px;opacity:.6">${APP_VER}</p>
+  </div>`;
+  document.body.appendChild(wrap);
+  document.getElementById('bkFile').onchange=ev=>{const f=ev.target.files&&ev.target.files[0]; if(f){closeSet(); importBackup(f);}};
+}
+function closeSet(){const b=document.getElementById('setBg'); if(b)b.remove();}
+document.body.addEventListener('click',e=>{
+  const bg=e.target.closest('#setBg'); if(!bg)return;
+  if(e.target.closest('[data-xclose]')||e.target.id==='setBg'){closeSet(); return;}
+  if(e.target.closest('[data-automic]')){autoMic=!autoMic; localStorage.setItem(MICKEY,autoMic?'1':'0'); closeSet(); openSet(); return;}
+  if(e.target.closest('[data-bkout]')){closeSet(); exportBackup(); return;}
+  if(e.target.closest('[data-bkin]')){document.getElementById('bkFile').click(); return;}
 });
 
 /* ---------- 검색 (기록이 쌓이면 날짜를 기억 못 해도 찾을 수 있게) ---------- */
@@ -649,19 +729,18 @@ document.body.addEventListener('click',e=>{
 
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeEdit(); closeDay();}});
 
-const APP_VER='v0.4 · 9/20';
+const APP_VER='v0.5 · 9/20';
 document.getElementById('ver').textContent=APP_VER;
 
 /* 앱을 열면 바로 듣기 — 빅스비로 열고 손 안 대고 말하려는 용도.
    주소에 ?mic=1 을 붙여도 한 번만 켜진다. */
 const MICKEY=KEY+'.automic';
 let autoMic=localStorage.getItem(MICKEY)==='1';
-const amBtn=document.getElementById('autoMic');
-function syncAutoMic(){amBtn.textContent=autoMic?'열면 바로 듣기 ●':'열면 바로 듣기 ○';}
-amBtn.onclick=()=>{autoMic=!autoMic; localStorage.setItem(MICKEY,autoMic?'1':'0'); syncAutoMic();};
-syncAutoMic();
+document.getElementById('setBtn').onclick=openSet;
 const wantMic = autoMic || new URLSearchParams(location.search).get('mic')==='1';
 if(wantMic && SR){ setTimeout(()=>{ try{micBtn.click()}catch(e){} }, 400); }
+// 첫 실행 예시 — 선언이 다 끝난 뒤에 돌아야 한다
+if(!localStorage.getItem(KEY+'.seen')){localStorage.setItem(KEY+'.seen','1'); if(tasks.length===0){add('이 앱 폰 크롬에서 열어 🎙️ 눌러보기'); addMode='todo'; add('세금계산서 발행 빨리'); add('내일 오후 3시 병원 예약');}}
 syncModes(); render(); setInterval(render,60000);
 if(fixedFutureDone){document.getElementById('hint').textContent=`아직 안 온 날인데 '한 일'로 저장돼 있던 ${fixedFutureDone}개를 할 일로 되돌렸어요.`;}
 
