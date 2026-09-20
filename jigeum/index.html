@@ -194,6 +194,11 @@
 <script>
 const KEY='jigeum.tasks.v1';
 let tasks=load(); let view='now'; let addMode='todo'; let dayAddMode='done';
+/* 보정: "한 일"인데 기록 시각이 아직 오지 않은 항목 = 실제로는 예정된 할 일.
+   (예전 달력 상세창이 미래 날짜도 완료로 저장하던 버그의 흔적을 되돌린다) */
+let fixedFutureDone=0;
+tasks.forEach(t=>{ if(t.done&&t.completedAt&&t.completedAt>Date.now()){ t.done=false; t.due=t.due||t.completedAt; t.completedAt=null; fixedFutureDone++; } });
+if(fixedFutureDone)save();
 let calY, calM, calSel=null;
 (()=>{const n=new Date(); calY=n.getFullYear(); calM=n.getMonth();})();
 
@@ -477,7 +482,8 @@ document.body.addEventListener('click',e=>{
   if(e.target.closest('[data-remove]')){tasks=tasks.filter(x=>x.id!==editId); save(); closeEdit(); render(); return;}
   if(e.target.closest('[data-toggle]')){
     const t=tasks.find(x=>x.id===editId);
-    if(t){ if(t.done){t.done=false; t.completedAt=null;} else {t.done=true; t.completedAt=t.due&&t.due<=Date.now()?t.due:Date.now();} }
+    // 되돌릴 때 예정일이 없으면 기록돼 있던 날짜를 예정일로 삼는다(안 그러면 달력에서 사라짐)
+    if(t){ if(t.done){const back=t.due||t.completedAt; t.done=false; t.completedAt=null; t.due=back||null;} else {t.done=true; t.completedAt=t.due&&t.due<=Date.now()?t.due:Date.now();} }
     save(); closeEdit(); render(); return;}
   if(e.target.closest('#eMic')){
     const btn=e.target.closest('#eMic'), ta=document.getElementById('eNote');
@@ -561,6 +567,7 @@ document.body.addEventListener('click',e=>{
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeEdit(); closeDay();}});
 
 syncModes(); render(); setInterval(render,60000);
+if(fixedFutureDone){document.getElementById('hint').textContent=`아직 안 온 날인데 '한 일'로 저장돼 있던 ${fixedFutureDone}개를 할 일로 되돌렸어요.`;}
 
 // 새 버전이 올라오면 알아서 갈아끼운다
 if('serviceWorker' in navigator){
