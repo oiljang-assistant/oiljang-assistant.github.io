@@ -76,8 +76,14 @@
   li.task.isdone .t{text-decoration:line-through; color:var(--muted)}
   li.task .m{font-size:12px; color:var(--muted); font-weight:600; margin-top:3px}
   li.task .m .u{color:var(--late)} li.task .m .a{color:var(--asap)}
+  .tel{color:var(--now); text-decoration:none; border-bottom:1px dashed currentColor}
   .del{flex:0 0 auto; border:0; background:transparent; color:var(--muted); font-size:19px; line-height:1; padding:2px 4px; cursor:pointer; opacity:.5}
 
+  .srch-btn{border:0; background:transparent; font-size:17px; cursor:pointer; padding:2px 0 2px 10px; line-height:1}
+  .srch-hit{background:var(--card); border:1px solid var(--line); border-radius:12px; padding:11px 13px; margin-bottom:6px; cursor:pointer}
+  .srch-hit .w{font-size:11.5px; font-weight:700; color:var(--muted); margin-bottom:2px}
+  .srch-hit .x{font-size:15px; font-weight:600; word-break:keep-all}
+  .srch-hit .nt{font-size:12.5px; color:var(--muted); margin-top:3px; font-weight:600}
   .later-row{display:flex; gap:8px; margin-top:26px; flex-wrap:wrap}
   .later{border:1px dashed var(--line); background:transparent; color:var(--muted); font-family:inherit; font-size:12.5px; font-weight:700; padding:8px 14px; border-radius:999px; cursor:pointer}
   .later.on{border-style:solid; border-color:var(--now); color:var(--now)}
@@ -138,6 +144,7 @@
   .mic.on{background:var(--late); color:#fff; animation:pulse 1s infinite}
   @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(200,73,47,.4)}50%{box-shadow:0 0 0 10px rgba(200,73,47,0)}}
   .add{background:var(--now); color:#fff; font-weight:800}
+  .vbtn{border:0;background:transparent;color:inherit;font:inherit;cursor:pointer;text-decoration:underline dotted;padding:0}
   .ver{text-align:center; font-size:10px; color:var(--muted); opacity:.5; margin-top:3px; font-weight:600}
   .hint{max-width:560px; margin:7px auto 0; font-size:11.5px; color:var(--muted); text-align:center; font-weight:600}
 
@@ -175,7 +182,7 @@
 </style>
 </head>
 <body>
-  <div class="greet"><h1 id="greetTitle">좋은 아침</h1><div class="sub" id="greetSub"></div></div>
+  <div class="greet"><h1 id="greetTitle">좋은 아침</h1><div class="sub" id="greetSub"></div><button class="srch-btn" id="searchBtn" aria-label="검색">🔍</button></div>
   <div class="tabs">
     <button data-view="now" class="active">지금</button>
     <button data-view="cal">달력</button>
@@ -193,7 +200,7 @@
       <button class="add" id="add" aria-label="추가">＋</button>
     </div>
     <div class="hint" id="hint">🎙️ 말하거나 적고 ＋. 날짜·"빨리"·"급함"은 자동 인식해요.</div>
-    <div class="ver" id="ver"></div>
+    <div class="ver"><button id="autoMic" class="vbtn"></button> · <span id="ver"></span></div>
   </div></div>
 
 <script>
@@ -312,7 +319,7 @@ function viewNow(all){
   if(!now){html+='<div class="now-empty"><b>오늘 할 일은 없어요</b>'+(soon.length?'앞으로 예정된 건 달력에 있어요.':'할 일을 말하거나 아래에 적어보세요.')+'</div>';}
   else{
     const m=fmtDue(now.due,now.urgent,now.asap); const cls=m?m.cls:'';
-    html+=`<div class="now-card ${cls}"><div class="now-text">${esc(now.text)}</div><div class="now-meta">
+    html+=`<div class="now-card ${cls}"><div class="now-text">${tel(esc(now.text))}</div><div class="now-meta">
       ${m?`<span class="chip ${m.cls}">${m.cls==='late'&&now.due?'⏰ ':''}${m.txt}</span>`:''}
       ${now.urgent&&!(m&&m.txt==='급함')?'<span class="chip late">급함</span>':''}
       ${act.length>1?`<span class="chip plain">다음 ${act.length-1}개</span>`:''}
@@ -340,11 +347,14 @@ function taskLi(t){
   const meta = m ? `<div class="m">${t.urgent?'<span class="u">● 급함</span> · ':''}${m.txt}</div>` : '';
   const memo = t.note ? ' <span class="memo" aria-label="메모 있음">📝</span>' : '';
   return `<li class="task"><button class="check" data-done="${t.id}" aria-label="완료"></button>
-    <div class="body" data-edit="${t.id}"><div class="t">${esc(t.text)}${memo}</div>${meta}</div>
+    <div class="body" data-edit="${t.id}"><div class="t">${tel(esc(t.text))}${memo}</div>${meta}</div>
     <button class="del" data-del="${t.id}" aria-label="삭제">×</button></li>`;
 }
 
-function logRow(t){const d2=new Date(t.completedAt); const tm=`${d2.getHours()>=12?'오후':'오전'} ${((d2.getHours()+11)%12)+1}:${String(d2.getMinutes()).padStart(2,'0')}`; return `<div class="log-item" data-edit="${t.id}"><span class="time">${tm}</span><span class="txt">${esc(t.text)}${t.note?' <span class="memo">📝</span>':''}</span></div>`;}
+function logRow(t){const d2=new Date(t.completedAt); const tm=`${d2.getHours()>=12?'오후':'오전'} ${((d2.getHours()+11)%12)+1}:${String(d2.getMinutes()).padStart(2,'0')}`; return `<div class="log-item" data-edit="${t.id}"><span class="time">${tm}</span><span class="txt">${tel(esc(t.text))}${t.note?' <span class="memo">📝</span>':''}</span></div>`;}
+/* 글 속 전화번호를 눌러서 바로 걸 수 있게 만든다 (esc() 뒤에만 쓸 것) */
+const TEL_RE=/((?:0\d{1,2}|1[5-9]\d{2})[-.\s]?\d{3,4}[-.\s]?\d{4})/g;
+function tel(s){return s.replace(TEL_RE,m=>`<a class="tel" href="tel:${m.replace(/[^0-9]/g,'')}">${m}</a>`);}
 function viewCal(){
   const first=new Date(calY,calM,1), startDow=first.getDay(), dim=new Date(calY,calM+1,0).getDate();
   const dueBy={}, doneBy={};
@@ -493,9 +503,10 @@ function applyEdit(){
   save(); closeEdit(); render();
 }
 document.body.addEventListener('click',e=>{
+  if(e.target.closest('a.tel'))return; // 전화 링크는 그냥 통과
   const bg=e.target.closest('#editBg');
   const ed=e.target.closest('[data-edit]');
-  if(ed && !e.target.closest('[data-done],[data-del]')){openEdit(ed.dataset.edit); return;}
+  if(ed && !e.target.closest('[data-done],[data-del]') && !e.target.closest('#srchBg')){openEdit(ed.dataset.edit); return;} // 검색 결과는 검색쪽에서 처리
   if(!bg)return;
   if(e.target.closest('[data-close]')||e.target.id==='editBg'){closeEdit(); return;}
   if(e.target.closest('[data-save]')){applyEdit(); return;}
@@ -519,12 +530,58 @@ document.body.addEventListener('click',e=>{
     memoRec.start(); return;}
 });
 
+/* ---------- 검색 (기록이 쌓이면 날짜를 기억 못 해도 찾을 수 있게) ---------- */
+function openSearch(){
+  const wrap=document.createElement('div'); wrap.className='sheet-bg'; wrap.id='srchBg';
+  wrap.innerHTML=`<div class="sheet" role="dialog" aria-label="검색">
+    <div class="sheet-top"><h3>검색</h3><button class="x" data-sclose="1" aria-label="닫기">✕</button></div>
+    <input type="text" id="sQ" placeholder="이름·내용·전화번호" style="width:100%;font-weight:700" autocomplete="off">
+    <div id="sOut"></div>
+  </div>`;
+  document.body.appendChild(wrap);
+  const q=document.getElementById('sQ');
+  q.addEventListener('input',()=>runSearch(q.value));
+  runSearch('');
+  setTimeout(()=>q.focus(),40);
+}
+function runSearch(q){
+  const out=document.getElementById('sOut'); if(!out)return;
+  q=(q||'').trim().toLowerCase();
+  if(!q){out.innerHTML='<p class="none">이름이나 내용을 적으면 할 일과 한 일을 모두 찾아요.</p>'; return;}
+  const digits=q.replace(/[^0-9]/g,'');
+  const hit=tasks.filter(t=>{
+    const hay=((t.text||'')+' '+(t.note||'')).toLowerCase();
+    if(hay.includes(q))return true;
+    return digits.length>=3 && hay.replace(/[^0-9]/g,'').includes(digits);
+  }).sort((a,b)=>(b.completedAt||b.due||b.created)-(a.completedAt||a.due||a.created));
+  if(!hit.length){out.innerHTML='<p class="none">못 찾았어요.</p>'; return;}
+  out.innerHTML=hit.slice(0,50).map(t=>{
+    const when=t.done?t.completedAt:t.due;
+    const d=when?new Date(when):null;
+    const ws=d?`${d.getFullYear()!==new Date().getFullYear()?d.getFullYear()+'. ':''}${d.getMonth()+1}월 ${d.getDate()}일 ${d.getHours()>=12?'오후':'오전'} ${((d.getHours()+11)%12)+1}:${pad2(d.getMinutes())}`:'날짜 없음';
+    return `<div class="srch-hit" data-edit="${t.id}"><div class="w">${t.done?'✓ 한 일':'할 일'} · ${ws}</div>
+      <div class="x">${tel(esc(t.text))}</div>${t.note?`<div class="nt">📝 ${tel(esc(t.note))}</div>`:''}</div>`;
+  }).join('');
+}
+function closeSearch(){const b=document.getElementById('srchBg'); if(b)b.remove();}
+document.getElementById('searchBtn').onclick=openSearch;
+document.body.addEventListener('click',e=>{
+  const bg=e.target.closest('#srchBg'); if(!bg)return;
+  if(e.target.closest('a.tel'))return;
+  if(e.target.closest('[data-sclose]')||e.target.id==='srchBg'){closeSearch(); return;}
+  const ed=e.target.closest('[data-edit]');
+  if(ed){closeSearch(); openEdit(ed.dataset.edit);}
+});
+
 /* ---------- 그날 상세 창 (달력에서 선택된 날짜를 한 번 더 탭) ---------- */
 function openDay(key){
   const [y,m,d]=key.split('-').map(Number);
   // 아직 오지 않은 날 = 할 일, 오늘·지난 날 = 한 일 (바꿀 수 있음)
   const t0=new Date(); t0.setHours(0,0,0,0);
   dayAddMode = new Date(y,m,d).getTime()>t0.getTime() ? 'todo' : 'done';
+  const nowD=new Date(), isTodayD=(nowD.getFullYear()===y&&nowD.getMonth()===m&&nowD.getDate()===d);
+  const defTime = isTodayD ? `${pad2(nowD.getHours())}:${pad2(nowD.getMinutes())}`
+                           : (dayAddMode==='todo' ? '09:00' : '12:00');
   const due=tasks.filter(t=>t.due&&!t.done&&dayKey(t.due)===key).sort((a,b)=>a.due-b.due);
   const done=tasks.filter(t=>t.done&&t.completedAt&&dayKey(t.completedAt)===key).sort((a,b)=>a.completedAt-b.completedAt);
   const wrap=document.createElement('div'); wrap.className='sheet-bg'; wrap.id='dayBg'; wrap.dataset.day2=key;
@@ -541,7 +598,10 @@ function openDay(key){
     <div class="drow">
       <input type="text" id="dAdd" placeholder="${dayAddMode==='todo'?'예) 파미르 311호 방문':'예) 김사장 전화 — 파미르 문의'}">
       <button id="dMic" style="flex:0 0 46px">🎙️</button>
-      <button data-dsave="1">${dayAddMode==='todo'?'추가':'기록'}</button>
+    </div>
+    <div class="drow">
+      <input type="time" id="dTime" value="${defTime}" style="flex:0 0 130px">
+      <button data-dsave="1" style="flex:1">${dayAddMode==='todo'?'추가':'기록'}</button>
     </div>
     <p class="none" style="font-size:12px;margin-top:10px">기록한 뒤 그 줄을 탭하면 메모를 넣을 수 있어요.</p>
   </div>`;
@@ -553,21 +613,24 @@ document.body.addEventListener('click',e=>{
   const bg=e.target.closest('#dayBg'); if(!bg)return;
   if(e.target.closest('[data-dclose]')||e.target.id==='dayBg'){closeDay(); return;}
   const dm=e.target.closest('[data-dm]');
-  if(dm){const key=bg.dataset.day2, keep=(document.getElementById('dAdd')||{}).value||''; dayAddMode=dm.dataset.dm; closeDay(); openDay(key); const i=document.getElementById('dAdd'); if(i){i.value=keep;} return;}
+  if(dm){const key=bg.dataset.day2, keep=(document.getElementById('dAdd')||{}).value||'', keepT=(document.getElementById('dTime')||{}).value||''; dayAddMode=dm.dataset.dm; closeDay(); openDay(key); const i=document.getElementById('dAdd'); if(i){i.value=keep;} const it=document.getElementById('dTime'); if(it&&keepT){it.value=keepT;} return;}
   if(e.target.closest('[data-dsave]')){
     const key=bg.dataset.day2, inp=document.getElementById('dAdd'), v=(inp.value||'').trim();
     if(!v)return;
     const [y,m,d]=key.split('-').map(Number); const now=new Date();
     const isToday=(now.getFullYear()===y&&now.getMonth()===m&&now.getDate()===d);
     const mode=dayAddMode;
+    const tv=(document.getElementById('dTime')||{}).value||'';
+    const [th,tm2]=tv?tv.split(':').map(Number):[null,null];
     if(mode==='todo'){
-      // 할 일: 그 날 오전 9시 마감. 완료 전까지 달력에 빨간 점으로 남는다.
+      // 할 일: 입력한 시각이 마감. 완료 전까지 달력에 빨간 점으로 남는다.
       const {due,urgent,asap,clean}=parseKorean(v);
       const hm=due?new Date(due):null;
-      const dueMs=new Date(y,m,d,hm?hm.getHours():9,hm?hm.getMinutes():0).getTime();
-      tasks.push({id:uid(),text:clean,due:dueMs,urgent,asap,done:false,completedAt:null,note:null,created:Date.now()});
+      const hh = th!==null?th : (hm?hm.getHours():9), mi = th!==null?tm2 : (hm?hm.getMinutes():0);
+      tasks.push({id:uid(),text:clean,due:new Date(y,m,d,hh,mi).getTime(),urgent,asap,done:false,completedAt:null,note:null,created:Date.now()});
     }else{
-      const ms=isToday?Date.now():new Date(y,m,d,12,0).getTime();
+      // 한 일: 입력한 시각 그대로 기록한다(나중에 정리해도 실제 통화 시각을 남길 수 있게)
+      const ms = th!==null ? new Date(y,m,d,th,tm2).getTime() : (isToday?Date.now():new Date(y,m,d,12,0).getTime());
       tasks.push({id:uid(),text:v,due:null,urgent:false,asap:false,done:true,completedAt:ms,note:null,created:Date.now()});
     }
     save(); closeDay(); render(); openDay(key); return;}
@@ -586,8 +649,19 @@ document.body.addEventListener('click',e=>{
 
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeEdit(); closeDay();}});
 
-const APP_VER='v0.3 · 9/20';
+const APP_VER='v0.4 · 9/20';
 document.getElementById('ver').textContent=APP_VER;
+
+/* 앱을 열면 바로 듣기 — 빅스비로 열고 손 안 대고 말하려는 용도.
+   주소에 ?mic=1 을 붙여도 한 번만 켜진다. */
+const MICKEY=KEY+'.automic';
+let autoMic=localStorage.getItem(MICKEY)==='1';
+const amBtn=document.getElementById('autoMic');
+function syncAutoMic(){amBtn.textContent=autoMic?'열면 바로 듣기 ●':'열면 바로 듣기 ○';}
+amBtn.onclick=()=>{autoMic=!autoMic; localStorage.setItem(MICKEY,autoMic?'1':'0'); syncAutoMic();};
+syncAutoMic();
+const wantMic = autoMic || new URLSearchParams(location.search).get('mic')==='1';
+if(wantMic && SR){ setTimeout(()=>{ try{micBtn.click()}catch(e){} }, 400); }
 syncModes(); render(); setInterval(render,60000);
 if(fixedFutureDone){document.getElementById('hint').textContent=`아직 안 온 날인데 '한 일'로 저장돼 있던 ${fixedFutureDone}개를 할 일로 되돌렸어요.`;}
 
