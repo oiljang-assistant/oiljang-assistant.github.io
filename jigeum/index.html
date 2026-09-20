@@ -78,6 +78,10 @@
   li.task .m .u{color:var(--late)} li.task .m .a{color:var(--asap)}
   .del{flex:0 0 auto; border:0; background:transparent; color:var(--muted); font-size:19px; line-height:1; padding:2px 4px; cursor:pointer; opacity:.5}
 
+  .later-row{display:flex; gap:8px; margin-top:26px; flex-wrap:wrap}
+  .later{border:1px dashed var(--line); background:transparent; color:var(--muted); font-family:inherit; font-size:12.5px; font-weight:700; padding:8px 14px; border-radius:999px; cursor:pointer}
+  .later.on{border-style:solid; border-color:var(--now); color:var(--now)}
+
   /* calendar */
   .cal-head{display:flex; align-items:center; justify-content:center; gap:18px; margin:2px 0 14px}
   .cal-head button{border:0; background:var(--card); border:1px solid var(--line); width:38px; height:38px; border-radius:12px; font-size:18px; cursor:pointer; color:var(--ink)}
@@ -174,7 +178,6 @@
   <div class="tabs">
     <button data-view="now" class="active">지금</button>
     <button data-view="cal">달력</button>
-    <button data-view="log">한 일</button>
   </div>
   <div id="screen"></div>
 
@@ -193,7 +196,7 @@
 
 <script>
 const KEY='jigeum.tasks.v1';
-let tasks=load(); let view='now'; let addMode='todo'; let dayAddMode='done';
+let tasks=load(); let view='now'; let addMode='todo'; let dayAddMode='done'; let showSomeday=false;
 /* 보정: "한 일"인데 기록 시각이 아직 오지 않은 항목 = 실제로는 예정된 할 일.
    (예전 달력 상세창이 미래 날짜도 완료로 저장하던 버그의 흔적을 되돌린다) */
 let fixedFutureDone=0;
@@ -297,10 +300,14 @@ function fitCal(){
 }
 window.addEventListener('resize',()=>{if(view==='cal')fitCal();});
 
-function viewNow(act){
+function viewNow(all){
+  // 지금 화면엔 오늘까지 해야 할 것만 — 지난 일·오늘 마감·급함·빨리
+  const act=all.filter(t=>priority(t)<=2.6);
+  const later=all.filter(t=>priority(t)>2.6);
+  const soon=later.filter(t=>t.due), someday=later.filter(t=>!t.due);
   const now=act[0];
   let html='<p class="now-label">지금</p>';
-  if(!now){html+='<div class="now-empty"><b>지금은 자유예요</b>할 일을 말하거나 아래에 적어보세요.</div>';}
+  if(!now){html+='<div class="now-empty"><b>오늘 할 일은 없어요</b>'+(soon.length?'앞으로 예정된 건 달력에 있어요.':'할 일을 말하거나 아래에 적어보세요.')+'</div>';}
   else{
     const m=fmtDue(now.due,now.urgent,now.asap); const cls=m?m.cls:'';
     html+=`<div class="now-card ${cls}"><div class="now-text">${esc(now.text)}</div><div class="now-meta">
@@ -310,11 +317,19 @@ function viewNow(act){
       </div><button class="now-done" data-done="${now.id}">완료 ✓</button></div>`;
   }
   const rest=act.slice(1);
-  const groups=[['due','마감',rest.filter(t=>kindOf(t)==='due')],['asap','빨리',rest.filter(t=>kindOf(t)==='asap')],['someday','언젠가·장기',rest.filter(t=>kindOf(t)==='someday')]];
+  const groups=[['due','오늘·지난 일',rest.filter(t=>t.due)],['asap','빨리·급함',rest.filter(t=>!t.due)]];
   for(const [k,name,arr] of groups){ if(!arr.length)continue;
     html+=`<div class="sec ${k}"><span class="dot"></span><h2>${name}</h2><span class="count">${arr.length}</span></div><ul>`;
     for(const t of arr) html+=taskLi(t);
     html+='</ul>';
+  }
+  // 오늘 일이 아닌 것들은 화면에서 치우고 줄 하나로만 알린다
+  if(soon.length||someday.length){
+    html+='<div class="later-row">';
+    if(soon.length)html+=`<button class="later" data-goto="cal">📅 예정 ${soon.length}개</button>`;
+    if(someday.length)html+=`<button class="later ${showSomeday?'on':''}" data-someday="1">언젠가 ${someday.length}개</button>`;
+    html+='</div>';
+    if(showSomeday&&someday.length){html+='<ul style="margin-top:10px">'; for(const t of someday)html+=taskLi(t); html+='</ul>';}
   }
   return html;
 }
@@ -401,7 +416,7 @@ document.getElementById('mTodo').onclick=()=>{addMode='todo'; syncModes();};
 document.getElementById('mDone').onclick=()=>{addMode='done'; syncModes();};
 function syncModes(){document.getElementById('mTodo').classList.toggle('on',addMode==='todo'); document.getElementById('mDone').classList.toggle('on',addMode==='done'); document.getElementById('box').placeholder=addMode==='done'?'방금 한 일 (기록으로 남겨요)':'할 일 (예: 내일 오후 3시 병원 예약)';}
 
-document.querySelector('.tabs').addEventListener('click',e=>{const b=e.target.closest('[data-view]'); if(b){view=b.dataset.view; render();}});
+document.querySelector('.tabs').addEventListener('click',e=>{const b=e.target.closest('[data-view]'); if(b){view=b.dataset.view; render(); window.scrollTo(0,0);}});
 document.body.addEventListener('click',e=>{
   const done=e.target.closest('[data-done]'), del=e.target.closest('[data-del]');
   const cal=e.target.closest('[data-cal]'), day=e.target.closest('[data-day]');
@@ -409,6 +424,9 @@ document.body.addEventListener('click',e=>{
   if(del){tasks=tasks.filter(x=>x.id!==del.dataset.del); save(); render();}
   if(cal){calM+=+cal.dataset.cal; if(calM<0){calM=11;calY--;} if(calM>11){calM=0;calY++;} calSel=null; render();}
   if(day){ if(calSel===day.dataset.day){openDay(day.dataset.day);} else {calSel=day.dataset.day; render();} }
+  const goto=e.target.closest('[data-goto]'), sd=e.target.closest('[data-someday]');
+  if(goto){view=goto.dataset.goto; calSel=null; render(); window.scrollTo(0,0); return;}
+  if(sd){showSomeday=!showSomeday; render(); return;}
 });
 
 /* ---- 음성 ---- */
