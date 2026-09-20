@@ -2,7 +2,7 @@
 // 네트워크 우선. 인터넷이 되면 항상 최신을 가져오고, 안 되면 캐시로 연다.
 // (캐시 우선으로 하면 고쳐서 올려도 폰에 옛날 화면이 계속 남는다)
 
-const CACHE = 'jigeum-v1';
+const CACHE = 'jigeum-v2';
 const ASSETS = [
   './',
   './index.html',
@@ -32,8 +32,17 @@ self.addEventListener('activate', e => {
 
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
+  // ⚠️ GitHub Pages가 파일에 10분 캐시(max-age=600)를 건다.
+  //    그냥 fetch하면 그 10분 동안 브라우저 캐시의 옛 파일을 돌려줘서
+  //    "네트워크 우선"인데도 폰에 옛 화면이 남는다. no-store로 캐시를 건너뛴다.
+  let req = e.request;
+  try {
+    if (new URL(e.request.url).origin === self.location.origin) {
+      req = new Request(e.request.url, { cache: 'no-store', credentials: 'same-origin' });
+    }
+  } catch (err) {}
   e.respondWith(
-    fetch(e.request)
+    fetch(req)
       .then(r => {
         const copy = r.clone();
         caches.open(CACHE).then(c => c.put(e.request, copy)).catch(() => {});
