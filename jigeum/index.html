@@ -186,6 +186,28 @@
   .sheet .dmode{display:flex;gap:6px;margin-top:8px}
   .sheet .dmode button{flex:1;padding:9px;border:1px solid var(--line);background:transparent;color:var(--muted);font-family:inherit;font-size:13px;font-weight:800;border-radius:999px;cursor:pointer}
   .sheet .dmode button.on{background:var(--now);border-color:var(--now);color:#fff}
+  /* 루틴 */
+  .rt{background:var(--card); border:1px solid var(--line); border-radius:var(--r); box-shadow:var(--shadow); margin-bottom:22px; overflow:hidden}
+  .rt-head{display:flex; align-items:center; gap:10px; width:100%; border:0; background:transparent; color:inherit; font-family:inherit; padding:16px 18px; cursor:pointer; text-align:left}
+  .rt-head b{flex:1; font-size:17px; font-weight:800; letter-spacing:-.01em}
+  .rt-head .cnt{font-size:14px; font-weight:800; color:var(--asap); background:var(--asap-soft); padding:4px 11px; border-radius:999px}
+  .rt-head .arr{color:var(--muted); font-size:14px}
+  .rt-bar{height:4px; background:var(--line); margin:0 18px}
+  .rt-bar i{display:block; height:100%; background:var(--asap); border-radius:2px; transition:width .25s}
+  .rt-list{padding:8px 10px 12px}
+  .rt-item{display:flex; align-items:center; gap:12px; width:100%; border:0; background:transparent; color:inherit; font-family:inherit; font-size:17px; font-weight:700; padding:12px 8px; border-radius:12px; cursor:pointer; text-align:left}
+  .rt-item:active{background:var(--asap-soft)}
+  .rt-item .check{pointer-events:none}
+  .rt-item.on .check{background:var(--done); border-color:var(--done)}
+  .rt-item.on span.x{text-decoration:line-through; color:var(--muted)}
+  .rt.all{box-shadow:none}
+  .rt.all .rt-head .cnt{color:var(--done); background:var(--done-soft)}
+  .rt.all .rt-bar i{background:var(--done)}
+  .cell .d.rt{background:var(--asap)}
+  .cal-legend .lr i{background:var(--asap)}
+  .rt-edit{border:1px solid var(--line); border-radius:14px; padding:12px 14px; margin-top:10px}
+  .rt-edit .f2{display:flex; gap:8px; align-items:center; margin-top:8px; font-size:14px; font-weight:700; color:var(--muted)}
+  .rt-edit select{padding:9px 10px; border:1.5px solid var(--line); border-radius:10px; font:inherit; font-size:15px; background:transparent; color:var(--ink)}
   @media (prefers-reduced-motion: reduce){*{animation:none!important; transition:none!important}}
 </style>
 </head>
@@ -323,7 +345,7 @@ function viewNow(all){
   const later=all.filter(t=>priority(t)>2.6);
   const soon=later.filter(t=>t.due), someday=later.filter(t=>!t.due);
   const now=act[0];
-  let html='<p class="now-label">지금</p>';
+  let html=viewRoutines()+'<p class="now-label">지금</p>';
   if(!now){html+='<div class="now-empty"><b>오늘 할 일은 없어요</b>'+(soon.length?'앞으로 예정된 건 달력에 있어요.':'할 일을 말하거나 아래에 적어보세요.')+'</div>';}
   else{
     const m=fmtDue(now.due,now.urgent,now.asap); const cls=m?m.cls:'';
@@ -380,6 +402,7 @@ function viewCal(){
   for(let d=1;d<=dim;d++){
     const k=calY+'-'+calM+'-'+d, due=dueBy[k]||[], done=doneBy[k]||[];
     const has=due.length||done.length;
+    const rtAll=routines.some(r=>r.items.length&&rtDone(k,r)===r.items.length);
     const isToday=now.getFullYear()===calY&&now.getMonth()===calM&&now.getDate()===d;
     const sel=calSel===k;
     // 점: 할 일(미완료)=빨강, 한 일(완료)=초록
@@ -387,6 +410,7 @@ function viewCal(){
     if(has){dots='<div class="dots">';
       if(due.length)dots+='<span class="d"></span>';
       if(done.length)dots+='<span class="d done"></span>'; dots+='</div>';}
+    if(rtAll)dots=dots?dots.replace('</div>','<span class="d rt"></span></div>'):'<div class="dots"><span class="d rt"></span></div>';
     // 펼친 상태에서 칸 안에 보여줄 제목들 (할 일 먼저)
     let mini='';
     if(has){
@@ -395,9 +419,9 @@ function viewCal(){
       if(items.length>2)mini+=`<span class="more">+${items.length-2}</span>`;
       mini+='</div>';
     }
-    html+=`<div class="cell ${has?'has':''} ${isToday?'today':''} ${sel?'sel':''}" data-day="${k}"><span class="n">${d}</span>${dots}${mini}</div>`;
+    html+=`<div class="cell ${has||rtAll?'has':''} ${isToday?'today':''} ${sel?'sel':''}" data-day="${k}"><span class="n">${d}</span>${dots}${mini}</div>`;
   }
-  html+='</div><div class="cal-legend"><span class="lt"><i></i>할 일</span><span class="ld"><i></i>한 일</span></div>';
+  html+='</div><div class="cal-legend"><span class="lt"><i></i>할 일</span><span class="ld"><i></i>한 일</span><span class="lr"><i></i>루틴 다 함</span></div>';
   if(calSel){
     const [yy,mm,dd]=calSel.split('-').map(Number);
     const due=dueBy[calSel]||[], done=doneBy[calSel]||[];
@@ -549,7 +573,7 @@ const BKKEY=KEY+'.lastbackup';
 function lastBackup(){const v=+localStorage.getItem(BKKEY); return v||0;}
 function backupAgeDays(){const v=lastBackup(); return v?Math.floor((Date.now()-v)/86400000):null;}
 function exportBackup(){
-  const data={app:'jigeum', ver:1, exportedAt:new Date().toISOString(), tasks};
+  const data={app:'jigeum', ver:2, exportedAt:new Date().toISOString(), tasks, routines, rchecks};
   const blob=new Blob([JSON.stringify(data)],{type:'application/json'});
   const url=URL.createObjectURL(blob), a=document.createElement('a'), d=new Date();
   a.href=url; a.download=`지금-백업-${d.getFullYear()}${pad2(d.getMonth()+1)}${pad2(d.getDate())}.json`;
@@ -573,6 +597,12 @@ function importBackup(file){
                   done:!!t.done,completedAt:t.completedAt||null,note:t.note||null,created:t.created||Date.now()});
       have.add(t.id); added++;
     });
+    // 루틴도 합치기만 — 없는 루틴만 더하고, 체크 기록은 합친다
+    try{const d=JSON.parse(r.result);
+      if(Array.isArray(d.routines)){const ids=new Set(routines.map(x=>x.id)); d.routines.forEach(x=>{if(x&&x.id&&!ids.has(x.id)&&Array.isArray(x.items)){routines.push(x); ids.add(x.id);}});}
+      if(d.rchecks&&typeof d.rchecks==='object'){for(const k in d.rchecks){const day=rchecks[k]=rchecks[k]||{}; for(const rid in d.rchecks[k]){const c=day[rid]=day[rid]||[]; (d.rchecks[k][rid]||[]).forEach(i=>{if(!c.includes(i))c.push(i);});}}}
+      saveRt();
+    }catch(e){}
     save(); render();
     setMsg(added?`${added}개를 되살렸어요.`:'이미 다 있는 기록이었어요.');
   };
@@ -580,6 +610,82 @@ function importBackup(file){
   r.readAsText(file);
 }
 function setMsg(t){const h=document.getElementById('hint'); if(h)h.textContent=t;}
+
+/* ---------- 루틴 ----------
+   매일 반복되는 체크리스트. 체크는 날짜별로 따로 저장돼서 0시가 지나면 저절로 새로 시작한다.
+   정해둔 시간대(from~to시)에만 지금 화면에 뜬다. */
+const RTKEY=KEY+'.routines', RCKEY=KEY+'.rchecks';
+let routines=(()=>{try{return JSON.parse(localStorage.getItem(RTKEY))}catch(e){return null}})();
+if(!Array.isArray(routines)){
+  routines=[{id:uid(),name:'아침 루틴',from:4,to:12,items:['소금물 먹기','필수약 챙겨 먹기','이불 개기','제자리 100번 뛰기'].map(text=>({id:uid(),text}))}];
+  localStorage.setItem(RTKEY,JSON.stringify(routines));
+}
+let rchecks=(()=>{try{return JSON.parse(localStorage.getItem(RCKEY))||{}}catch(e){return{}}})();
+let rtOpen={};
+function saveRt(){localStorage.setItem(RTKEY,JSON.stringify(routines)); localStorage.setItem(RCKEY,JSON.stringify(rchecks));}
+function inWindow(r,h){return r.from<=r.to ? (h>=r.from&&h<r.to) : (h>=r.from||h<r.to);}
+function rtDone(key,r){const c=(rchecks[key]||{})[r.id]||[]; return r.items.filter(i=>c.includes(i.id)).length;}
+function viewRoutines(){
+  const h=new Date().getHours(), key=dayKey(Date.now());
+  let html='';
+  for(const r of routines){
+    if(!r.items.length||!inWindow(r,h))continue;
+    const c=(rchecks[key]||{})[r.id]||[], n=rtDone(key,r), all=n===r.items.length;
+    const open = rtOpen[r.id]!==undefined ? rtOpen[r.id] : !all;   // 덜 했으면 펼쳐두고, 다 하면 접는다
+    html+=`<div class="rt ${all?'all':''}"><button class="rt-head" data-rthead="${r.id}"><b>${all?'✓ ':''}${esc(r.name)}</b><span class="cnt">${n}/${r.items.length}</span><span class="arr">${open?'▲':'▼'}</span></button>
+      <div class="rt-bar"><i style="width:${Math.round(n/r.items.length*100)}%"></i></div>`;
+    if(open){html+='<div class="rt-list">'; for(const it of r.items){const on=c.includes(it.id); html+=`<button class="rt-item ${on?'on':''}" data-rtitem="${r.id}|${it.id}"><span class="check">${on?'✓':''}</span><span class="x">${esc(it.text)}</span></button>`;} html+='</div>';}
+    html+='</div>';
+  }
+  return html;
+}
+document.body.addEventListener('click',e=>{
+  const hd=e.target.closest('[data-rthead]'), it=e.target.closest('[data-rtitem]');
+  if(hd){const r=routines.find(x=>x.id===hd.dataset.rthead); if(!r)return; const key=dayKey(Date.now()); const cur=rtOpen[r.id]!==undefined?rtOpen[r.id]:rtDone(key,r)!==r.items.length; rtOpen[r.id]=!cur; render(); return;}
+  if(it){const [rid,iid]=it.dataset.rtitem.split('|'), key=dayKey(Date.now());
+    const day=rchecks[key]=rchecks[key]||{}, c=day[rid]=day[rid]||[];
+    const i=c.indexOf(iid); i>=0?c.splice(i,1):c.push(iid);
+    const r=routines.find(x=>x.id===rid); if(r&&rtDone(key,r)===r.items.length)delete rtOpen[rid];
+    saveRt(); render();}
+});
+
+/* 루틴 편집 — 항목은 한 줄에 하나씩 적으면 끝 */
+function hourOpts(sel){let o=''; for(let h=0;h<=24;h++)o+=`<option value="${h}" ${h===sel?'selected':''}>${h}시</option>`; return o;}
+function openRt(){
+  const wrap=document.createElement('div'); wrap.className='sheet-bg'; wrap.id='rtBg';
+  wrap.innerHTML=`<div class="sheet" role="dialog" aria-label="루틴">
+    <div class="sheet-top"><h3>루틴</h3><button class="x" data-rtclose="1" aria-label="닫기">✕</button></div>
+    <p class="none" style="font-size:13px;margin:0">항목은 한 줄에 하나씩. 정한 시간대에만 지금 화면에 떠요. 매일 0시에 새로 시작해요.</p>
+    ${routines.map(r=>`<div class="rt-edit" data-rid="${r.id}">
+      <input type="text" class="rn" value="${esc(r.name).replace(/"/g,'&quot;')}" style="width:100%;font-weight:800" placeholder="루틴 이름">
+      <div class="f2"><select class="rf">${hourOpts(r.from)}</select>부터<select class="rto">${hourOpts(r.to)}</select>까지</div>
+      <textarea class="ri" style="margin-top:8px;min-height:170px" placeholder="소금물 먹기&#10;약 먹기">${esc(r.items.map(i=>i.text).join('\n'))}</textarea>
+      <div class="btns" style="margin-top:8px"><button class="danger" data-rtdel="${r.id}" style="flex:0 0 auto;padding:10px 14px">삭제</button></div>
+    </div>`).join('')}
+    <div class="btns"><button class="ghost" data-rtnew="1">＋ 루틴 추가</button><button class="save" data-rtsave="1">저장</button></div>
+  </div>`;
+  document.body.appendChild(wrap);
+}
+function readRtForm(){
+  document.querySelectorAll('#rtBg .rt-edit').forEach(el=>{
+    const r=routines.find(x=>x.id===el.dataset.rid); if(!r)return;
+    r.name=el.querySelector('.rn').value.trim()||'루틴';
+    r.from=+el.querySelector('.rf').value; r.to=+el.querySelector('.rto').value;
+    // 같은 글자의 항목은 id를 유지해서 오늘 체크한 게 풀리지 않게 한다
+    const old=r.items;
+    r.items=el.querySelector('.ri').value.split('\n').map(x=>x.trim()).filter(Boolean)
+      .map(text=>{const o=old.find(i=>i.text===text); return o||{id:uid(),text};});
+  });
+}
+function closeRt(){const b=document.getElementById('rtBg'); if(b)b.remove();}
+document.body.addEventListener('click',e=>{
+  const bg=e.target.closest('#rtBg'); if(!bg)return;
+  if(e.target.closest('[data-rtclose]')||e.target.id==='rtBg'){closeRt(); return;}
+  if(e.target.closest('[data-rtsave]')){readRtForm(); saveRt(); closeRt(); render(); setMsg('루틴을 저장했어요.'); return;}
+  if(e.target.closest('[data-rtnew]')){readRtForm(); routines.push({id:uid(),name:'저녁 루틴',from:18,to:24,items:[]}); closeRt(); openRt(); return;}
+  const d=e.target.closest('[data-rtdel]');
+  if(d){if(!confirm('이 루틴을 지울까요?'))return; readRtForm(); routines=routines.filter(x=>x.id!==d.dataset.rtdel); saveRt(); closeRt(); openRt(); render(); return;}
+});
 
 /* ---------- 설정 ---------- */
 function openSet(){
@@ -590,6 +696,8 @@ function openSet(){
     <div class="sheet-top"><h3>설정</h3><button class="x" data-xclose="1" aria-label="닫기">✕</button></div>
     <div class="set-row"><div class="lab"><b>열면 바로 듣기</b><span>앱을 열자마자 마이크가 켜져요</span></div>
       <button data-automic="1" class="${autoMic?'on':''}">${autoMic?'켜짐':'꺼짐'}</button></div>
+    <div class="set-row"><div class="lab"><b>루틴</b><span>${routines.map(r=>esc(r.name)).join(', ')||'없음'}</span></div>
+      <button data-rtopen="1">고치기</button></div>
     <div class="set-row"><div class="lab"><b>백업 내보내기</b><span>마지막 백업: ${bk} · 기록 ${tasks.length}개</span></div>
       <button data-bkout="1">내보내기</button></div>
     <div class="set-row"><div class="lab"><b>백업 가져오기</b><span>없는 기록만 더해요. 지워지지 않아요</span></div>
@@ -607,6 +715,7 @@ document.body.addEventListener('click',e=>{
   if(e.target.closest('[data-xclose]')||e.target.id==='setBg'){closeSet(); return;}
   if(e.target.closest('[data-automic]')){autoMic=!autoMic; localStorage.setItem(MICKEY,autoMic?'1':'0'); closeSet(); openSet(); return;}
   if(e.target.closest('[data-bkout]')){closeSet(); exportBackup(); return;}
+  if(e.target.closest('[data-rtopen]')){closeSet(); openRt(); return;}
   if(e.target.closest('[data-bkin]')){document.getElementById('bkFile').click(); return;}
 });
 
@@ -729,7 +838,7 @@ document.body.addEventListener('click',e=>{
 
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeEdit(); closeDay();}});
 
-const APP_VER='v0.5 · 9/20';
+const APP_VER='v0.6 · 10/7';
 document.getElementById('ver').textContent=APP_VER;
 
 /* 앱을 열면 바로 듣기 — 빅스비로 열고 손 안 대고 말하려는 용도.
