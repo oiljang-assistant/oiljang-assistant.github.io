@@ -203,6 +203,21 @@
   .rt.all{box-shadow:none}
   .rt.all .rt-head .cnt{color:var(--done); background:var(--done-soft)}
   .rt.all .rt-bar i{background:var(--done)}
+  /* 원형 게이지 */
+  .tm-row{display:flex; gap:8px; margin-top:16px}
+  .tm-row button{flex:1; border:1.5px solid var(--line); background:transparent; color:var(--ink); font-family:inherit; font-size:15px; font-weight:800; padding:11px 0; border-radius:12px; cursor:pointer}
+  .tm-row button:active{background:var(--now-soft)}
+  .tm{display:flex; flex-direction:column; align-items:center; margin-top:18px}
+  .tm svg{width:210px; height:210px; transform:rotate(-90deg)}
+  .tm .bg{fill:none; stroke:var(--line); stroke-width:14}
+  .tm .fg{fill:none; stroke:var(--now); stroke-width:14; stroke-linecap:round; transition:stroke-dashoffset 1s linear}
+  .tm.end .fg{stroke:var(--late)}
+  .tm-wrap{position:relative; width:210px; height:210px}
+  .tm-num{position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center}
+  .tm-num b{font-size:44px; font-weight:800; letter-spacing:-.02em; font-variant-numeric:tabular-nums}
+  .tm-num span{font-size:14px; font-weight:700; color:var(--muted); margin-top:2px}
+  .tm.end .tm-num b{color:var(--late); font-size:30px}
+  .tm-stop{margin-top:12px; border:0; background:transparent; color:var(--muted); font-family:inherit; font-size:14px; font-weight:700; text-decoration:underline; cursor:pointer; padding:6px}
   .confetti{position:fixed; inset:0; pointer-events:none; z-index:80}
   .confetti i{position:absolute; width:9px; height:14px; border-radius:2px; animation:pop 1.3s cubic-bezier(.2,.7,.4,1) forwards}
   @keyframes pop{0%{transform:translate(0,0) rotate(0); opacity:1}100%{transform:translate(var(--dx),var(--dy)) rotate(var(--rot)); opacity:0}}
@@ -354,7 +369,7 @@ function viewNow(all){
       ${m?`<span class="chip ${m.cls}">${m.cls==='late'&&now.due?'⏰ ':''}${m.txt}</span>`:''}
       ${now.urgent&&!(m&&m.txt==='급함')?'<span class="chip late">급함</span>':''}
       ${act.length>1?`<span class="chip plain">다음 ${act.length-1}개</span>`:''}
-      </div><button class="now-done" data-done="${now.id}">완료 ✓</button></div>`;
+      </div>${timerHtml(now)}<button class="now-done" data-done="${now.id}">완료 ✓</button></div>`;
   }
   const rest=act.slice(1);
   const groups=[['due','오늘·지난 일',rest.filter(t=>t.due)],['asap','빨리·급함',rest.filter(t=>!t.due)]];
@@ -467,8 +482,8 @@ document.querySelector('.tabs').addEventListener('click',e=>{const b=e.target.cl
 document.body.addEventListener('click',e=>{
   const done=e.target.closest('[data-done]'), del=e.target.closest('[data-del]');
   const cal=e.target.closest('[data-cal]'), day=e.target.closest('[data-day]');
-  if(done){const t=tasks.find(x=>x.id===done.dataset.done); if(t){t.done=true; t.completedAt=Date.now(); save(); render();}}
-  if(del){tasks=tasks.filter(x=>x.id!==del.dataset.del); save(); render();}
+  if(done){const t=tasks.find(x=>x.id===done.dataset.done); if(t){t.done=true; t.completedAt=Date.now(); if(timer&&timer.taskId===t.id)tmClear(); save(); render();}}
+  if(del){if(timer&&timer.taskId===del.dataset.del)tmClear(); tasks=tasks.filter(x=>x.id!==del.dataset.del); save(); render();}
   if(cal){calM+=+cal.dataset.cal; if(calM<0){calM=11;calY--;} if(calM>11){calM=0;calY++;} calSel=null; render();}
   if(day){ if(calSel===day.dataset.day){openDay(day.dataset.day);} else {calSel=day.dataset.day; render();} }
   const goto=e.target.closest('[data-goto]'), sd=e.target.closest('[data-someday]');
@@ -654,6 +669,55 @@ document.body.addEventListener('click',e=>{
       confetti(it); setTimeout(render,1300);
     }else render();}
 });
+
+/* ---------- 원형 게이지 ----------
+   지금 할 일에 시간을 걸면 원이 줄어든다. 시작 시각을 저장해서 앱을 껐다 켜도 이어진다.
+   웹앱이라 화면이 꺼지면 소리를 못 낸다 → 도는 동안 화면이 안 꺼지게 붙잡아 둔다(Wake Lock). */
+const TMKEY=KEY+'.timer', RING=2*Math.PI*90;
+let timer=(()=>{try{return JSON.parse(localStorage.getItem(TMKEY))}catch(e){return null}})();
+let tmTick=null, wakeLock=null, audioCtx=null;
+function saveTimer(){timer?localStorage.setItem(TMKEY,JSON.stringify(timer)):localStorage.removeItem(TMKEY);}
+function tmLeft(){return timer?Math.max(0,timer.start+timer.dur-Date.now()):0;}
+function timerHtml(t){
+  if(!timer||timer.taskId!==t.id)
+    return `<div class="tm-row">${[10,25,45].map(m=>`<button data-tmstart="${m}">⏱ ${m}분</button>`).join('')}</div>`;
+  const left=tmLeft(), end=left===0;
+  return `<div class="tm ${end?'end':''}"><div class="tm-wrap"><svg viewBox="0 0 210 210"><circle class="bg" cx="105" cy="105" r="90"/><circle class="fg" cx="105" cy="105" r="90" stroke-dasharray="${RING}" stroke-dashoffset="${end?0:RING*(1-left/timer.dur)}"/></svg>
+    <div class="tm-num"><b id="tmNum">${end?'시간 끝':fmtLeft(left)}</b><span>${end?'다음으로 넘어가도 돼요':Math.round(timer.dur/60000)+'분 중'}</span></div></div>
+    <button class="tm-stop" data-tmstop="1">${end?'닫기':'그만하기'}</button></div>`;
+}
+function fmtLeft(ms){const s=Math.ceil(ms/1000); return Math.floor(s/60)+':'+String(s%60).padStart(2,'0');}
+function tmUpdate(){
+  if(!timer){clearInterval(tmTick); tmTick=null; return;}
+  const left=tmLeft(), fg=document.querySelector('.tm .fg'), num=document.getElementById('tmNum');
+  if(fg)fg.style.strokeDashoffset=RING*(1-left/timer.dur);
+  if(num&&left>0)num.textContent=fmtLeft(left);
+  if(left===0&&!timer.rang){timer.rang=true; saveTimer(); clearInterval(tmTick); tmTick=null; tmAlarm(); render();}
+}
+function tmRun(){ if(timer&&!timer.rang&&!tmTick){tmTick=setInterval(tmUpdate,1000); keepAwake();} }
+async function keepAwake(){try{if('wakeLock' in navigator&&!wakeLock){wakeLock=await navigator.wakeLock.request('screen'); wakeLock.addEventListener('release',()=>{wakeLock=null;});}}catch(e){}}
+function letSleep(){try{wakeLock&&wakeLock.release()}catch(e){} wakeLock=null;}
+function tmAlarm(){
+  letSleep();
+  if(navigator.vibrate)navigator.vibrate([300,150,300,150,600]);
+  try{ // 띵-띵-띵 세 번
+    const ctx=audioCtx||(audioCtx=new (window.AudioContext||window.webkitAudioContext)()); ctx.resume();
+    [0,.35,.7].forEach(t=>{const o=ctx.createOscillator(), g=ctx.createGain(); o.type='sine'; o.frequency.value=880;
+      g.gain.setValueAtTime(.0001,ctx.currentTime+t); g.gain.exponentialRampToValueAtTime(.4,ctx.currentTime+t+.02); g.gain.exponentialRampToValueAtTime(.0001,ctx.currentTime+t+.3);
+      o.connect(g); g.connect(ctx.destination); o.start(ctx.currentTime+t); o.stop(ctx.currentTime+t+.32);});
+  }catch(e){}
+}
+function tmClear(){timer=null; saveTimer(); clearInterval(tmTick); tmTick=null; letSleep();}
+document.body.addEventListener('click',e=>{
+  const st=e.target.closest('[data-tmstart]');
+  if(st){const now=active().filter(t=>priority(t)<=2.6)[0]; if(!now)return;
+    // 소리는 사용자가 누른 순간에 깨워둬야 나중에 울릴 수 있다
+    try{audioCtx=audioCtx||new (window.AudioContext||window.webkitAudioContext)(); audioCtx.resume();}catch(err){}
+    timer={taskId:now.id,start:Date.now(),dur:+st.dataset.tmstart*60000,rang:false}; saveTimer(); render(); tmRun(); return;}
+  if(e.target.closest('[data-tmstop]')){tmClear(); render(); return;}
+});
+// 다른 앱 갔다 돌아오면: 그새 끝났으면 바로 알리고, 아니면 다시 화면을 붙잡는다
+document.addEventListener('visibilitychange',()=>{ if(!document.hidden&&timer){ if(!timer.rang)keepAwake(); tmUpdate(); tmRun(); } });
 
 /* 루틴을 다 끝내면 한 번 터뜨리는 폭죽 */
 function confetti(from){
@@ -861,7 +925,7 @@ document.body.addEventListener('click',e=>{
 
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeEdit(); closeDay();}});
 
-const APP_VER='v0.6.2 · 10/7';
+const APP_VER='v0.7 · 10/7';
 document.getElementById('ver').textContent=APP_VER;
 
 /* 앱을 열면 바로 듣기 — 빅스비로 열고 손 안 대고 말하려는 용도.
@@ -873,7 +937,8 @@ const wantMic = autoMic || new URLSearchParams(location.search).get('mic')==='1'
 if(wantMic && SR){ setTimeout(()=>{ try{micBtn.click()}catch(e){} }, 400); }
 // 첫 실행 예시 — 선언이 다 끝난 뒤에 돌아야 한다
 if(!localStorage.getItem(KEY+'.seen')){localStorage.setItem(KEY+'.seen','1'); if(tasks.length===0){add('이 앱 폰 크롬에서 열어 🎙️ 눌러보기'); addMode='todo'; add('세금계산서 발행 빨리'); add('내일 오후 3시 병원 예약');}}
-syncModes(); render(); setInterval(render,60000);
+if(timer&&!tasks.some(t=>t.id===timer.taskId&&!t.done))tmClear();
+syncModes(); render(); tmUpdate(); tmRun(); setInterval(render,60000);
 if(fixedFutureDone){document.getElementById('hint').textContent=`아직 안 온 날인데 '한 일'로 저장돼 있던 ${fixedFutureDone}개를 할 일로 되돌렸어요.`;}
 
 // 새 버전이 올라오면 알아서 갈아끼운다
