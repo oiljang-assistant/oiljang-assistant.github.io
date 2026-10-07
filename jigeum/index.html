@@ -203,8 +203,9 @@
   .rt.all{box-shadow:none}
   .rt.all .rt-head .cnt{color:var(--done); background:var(--done-soft)}
   .rt.all .rt-bar i{background:var(--done)}
-  .cell .d.rt{background:var(--asap)}
-  .cal-legend .lr i{background:var(--asap)}
+  .confetti{position:fixed; inset:0; pointer-events:none; z-index:80}
+  .confetti i{position:absolute; width:9px; height:14px; border-radius:2px; animation:pop 1.3s cubic-bezier(.2,.7,.4,1) forwards}
+  @keyframes pop{0%{transform:translate(0,0) rotate(0); opacity:1}100%{transform:translate(var(--dx),var(--dy)) rotate(var(--rot)); opacity:0}}
   .rt-edit{border:1px solid var(--line); border-radius:14px; padding:12px 14px; margin-top:10px}
   .rt-edit .f2{display:flex; gap:8px; align-items:center; margin-top:8px; font-size:14px; font-weight:700; color:var(--muted)}
   .rt-edit select{padding:9px 10px; border:1.5px solid var(--line); border-radius:10px; font:inherit; font-size:15px; background:transparent; color:var(--ink)}
@@ -402,7 +403,6 @@ function viewCal(){
   for(let d=1;d<=dim;d++){
     const k=calY+'-'+calM+'-'+d, due=dueBy[k]||[], done=doneBy[k]||[];
     const has=due.length||done.length;
-    const rtAll=routines.some(r=>r.items.length&&rtDone(k,r)===r.items.length);
     const isToday=now.getFullYear()===calY&&now.getMonth()===calM&&now.getDate()===d;
     const sel=calSel===k;
     // 점: 할 일(미완료)=빨강, 한 일(완료)=초록
@@ -410,7 +410,6 @@ function viewCal(){
     if(has){dots='<div class="dots">';
       if(due.length)dots+='<span class="d"></span>';
       if(done.length)dots+='<span class="d done"></span>'; dots+='</div>';}
-    if(rtAll)dots=dots?dots.replace('</div>','<span class="d rt"></span></div>'):'<div class="dots"><span class="d rt"></span></div>';
     // 펼친 상태에서 칸 안에 보여줄 제목들 (할 일 먼저)
     let mini='';
     if(has){
@@ -419,9 +418,9 @@ function viewCal(){
       if(items.length>2)mini+=`<span class="more">+${items.length-2}</span>`;
       mini+='</div>';
     }
-    html+=`<div class="cell ${has||rtAll?'has':''} ${isToday?'today':''} ${sel?'sel':''}" data-day="${k}"><span class="n">${d}</span>${dots}${mini}</div>`;
+    html+=`<div class="cell ${has?'has':''} ${isToday?'today':''} ${sel?'sel':''}" data-day="${k}"><span class="n">${d}</span>${dots}${mini}</div>`;
   }
-  html+='</div><div class="cal-legend"><span class="lt"><i></i>할 일</span><span class="ld"><i></i>한 일</span><span class="lr"><i></i>루틴 다 함</span></div>';
+  html+='</div><div class="cal-legend"><span class="lt"><i></i>할 일</span><span class="ld"><i></i>한 일</span></div>';
   if(calSel){
     const [yy,mm,dd]=calSel.split('-').map(Number);
     const due=dueBy[calSel]||[], done=doneBy[calSel]||[];
@@ -633,6 +632,7 @@ function viewRoutines(){
   for(const r of routines){
     if(!r.items.length||!inWindow(r,h))continue;
     const c=(rchecks[key]||{})[r.id]||[], n=rtDone(key,r), all=n===r.items.length;
+    if(all)continue;   // 다 했으면 오늘은 끝 — 성과 표시 없이 사라진다
     const open = rtOpen[r.id]!==undefined ? rtOpen[r.id] : !all;   // 덜 했으면 펼쳐두고, 다 하면 접는다
     html+=`<div class="rt ${all?'all':''}"><button class="rt-head" data-rthead="${r.id}"><b>${all?'✓ ':''}${esc(r.name)}</b><span class="cnt">${n}/${r.items.length}</span><span class="arr">${open?'▲':'▼'}</span></button>
       <div class="rt-bar"><i style="width:${Math.round(n/r.items.length*100)}%"></i></div>`;
@@ -647,9 +647,30 @@ document.body.addEventListener('click',e=>{
   if(it){const [rid,iid]=it.dataset.rtitem.split('|'), key=dayKey(Date.now());
     const day=rchecks[key]=rchecks[key]||{}, c=day[rid]=day[rid]||[];
     const i=c.indexOf(iid); i>=0?c.splice(i,1):c.push(iid);
-    const r=routines.find(x=>x.id===rid); if(r&&rtDone(key,r)===r.items.length)delete rtOpen[rid];
-    saveRt(); render();}
+    const r=routines.find(x=>x.id===rid); saveRt();
+    if(r&&rtDone(key,r)===r.items.length){
+      it.classList.add('on'); it.querySelector('.check').textContent='✓';
+      const card=it.closest('.rt'); if(card){card.classList.add('all'); const cn=card.querySelector('.cnt'); if(cn)cn.textContent=r.items.length+'/'+r.items.length; const bar=card.querySelector('.rt-bar i'); if(bar)bar.style.width='100%';}
+      confetti(it); setTimeout(render,1300);
+    }else render();}
 });
+
+/* 루틴을 다 끝내면 한 번 터뜨리는 폭죽 */
+function confetti(from){
+  if(matchMedia('(prefers-reduced-motion: reduce)').matches)return;
+  const b=from.getBoundingClientRect(), x=b.left+b.width/2, y=b.top+b.height/2;
+  const colors=['#137A6B','#3FBDA8','#B5761A','#E8735A','#5FB37C','#F2C94C'];
+  const box=document.createElement('div'); box.className='confetti';
+  for(let i=0;i<70;i++){
+    const p=document.createElement('i'), a=Math.random()*Math.PI*2, d=120+Math.random()*220;
+    p.style.left=x+'px'; p.style.top=y+'px'; p.style.background=colors[i%colors.length];
+    p.style.setProperty('--dx',Math.cos(a)*d+'px'); p.style.setProperty('--dy',(Math.sin(a)*d-80+Math.random()*260)+'px');
+    p.style.setProperty('--rot',(Math.random()*720-360)+'deg'); p.style.animationDelay=(Math.random()*.12)+'s';
+    box.appendChild(p);
+  }
+  document.body.appendChild(box); setTimeout(()=>box.remove(),1600);
+  if(navigator.vibrate)navigator.vibrate([40,40,80]);
+}
 
 /* 루틴 편집 — 항목은 한 줄에 하나씩 적으면 끝 */
 function hourOpts(sel){let o=''; for(let h=0;h<=24;h+=0.5)o+=`<option value="${h}" ${h===sel?'selected':''}>${Math.floor(h)}시${h%1?' 30분':''}</option>`; return o;}
@@ -840,7 +861,7 @@ document.body.addEventListener('click',e=>{
 
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeEdit(); closeDay();}});
 
-const APP_VER='v0.6.1 · 10/7';
+const APP_VER='v0.6.2 · 10/7';
 document.getElementById('ver').textContent=APP_VER;
 
 /* 앱을 열면 바로 듣기 — 빅스비로 열고 손 안 대고 말하려는 용도.
