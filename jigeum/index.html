@@ -617,16 +617,18 @@ function setMsg(t){const h=document.getElementById('hint'); if(h)h.textContent=t
 const RTKEY=KEY+'.routines', RCKEY=KEY+'.rchecks';
 let routines=(()=>{try{return JSON.parse(localStorage.getItem(RTKEY))}catch(e){return null}})();
 if(!Array.isArray(routines)){
-  routines=[{id:uid(),name:'아침 루틴',from:4,to:12,items:['소금물 먹기','필수약 챙겨 먹기','이불 개기','제자리 100번 뛰기'].map(text=>({id:uid(),text}))}];
+  routines=[{id:uid(),name:'아침 루틴',from:7.5,to:9,items:['소금물 먹기','필수약 챙겨 먹기','이불 개기','제자리 100번 뛰기'].map(text=>({id:uid(),text}))}];
   localStorage.setItem(RTKEY,JSON.stringify(routines));
 }
+// 처음 넣었던 4~12시 기본값이 그대로면 7시 30분~9시로 옮긴다
+if(routines.length===1&&routines[0].name==='아침 루틴'&&routines[0].from===4&&routines[0].to===12){routines[0].from=7.5; routines[0].to=9; localStorage.setItem(RTKEY,JSON.stringify(routines));}
 let rchecks=(()=>{try{return JSON.parse(localStorage.getItem(RCKEY))||{}}catch(e){return{}}})();
 let rtOpen={};
 function saveRt(){localStorage.setItem(RTKEY,JSON.stringify(routines)); localStorage.setItem(RCKEY,JSON.stringify(rchecks));}
 function inWindow(r,h){return r.from<=r.to ? (h>=r.from&&h<r.to) : (h>=r.from||h<r.to);}
 function rtDone(key,r){const c=(rchecks[key]||{})[r.id]||[]; return r.items.filter(i=>c.includes(i.id)).length;}
 function viewRoutines(){
-  const h=new Date().getHours(), key=dayKey(Date.now());
+  const nd=new Date(), h=nd.getHours()+nd.getMinutes()/60, key=dayKey(Date.now());
   let html='';
   for(const r of routines){
     if(!r.items.length||!inWindow(r,h))continue;
@@ -650,7 +652,7 @@ document.body.addEventListener('click',e=>{
 });
 
 /* 루틴 편집 — 항목은 한 줄에 하나씩 적으면 끝 */
-function hourOpts(sel){let o=''; for(let h=0;h<=24;h++)o+=`<option value="${h}" ${h===sel?'selected':''}>${h}시</option>`; return o;}
+function hourOpts(sel){let o=''; for(let h=0;h<=24;h+=0.5)o+=`<option value="${h}" ${h===sel?'selected':''}>${Math.floor(h)}시${h%1?' 30분':''}</option>`; return o;}
 function openRt(){
   const wrap=document.createElement('div'); wrap.className='sheet-bg'; wrap.id='rtBg';
   wrap.innerHTML=`<div class="sheet" role="dialog" aria-label="루틴">
@@ -838,7 +840,7 @@ document.body.addEventListener('click',e=>{
 
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeEdit(); closeDay();}});
 
-const APP_VER='v0.6 · 10/7';
+const APP_VER='v0.6.1 · 10/7';
 document.getElementById('ver').textContent=APP_VER;
 
 /* 앱을 열면 바로 듣기 — 빅스비로 열고 손 안 대고 말하려는 용도.
